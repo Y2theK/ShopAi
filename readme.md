@@ -67,7 +67,7 @@ php artisan serve
 ```
 
 - For Frontend Setup
-- 
+
 ```shell
 cd frontend
 ```
