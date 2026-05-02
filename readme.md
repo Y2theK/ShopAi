@@ -20,7 +20,7 @@ orders.
 • Order Creation: A POST endpoint to submit a new order.
 
 ### Tech Stacks:
-`Laravel 12` `sqlite` `vue 3`  `tailwindcss`  `axios` 
+`Laravel 11` `sqlite` `vue 3`  `tailwindcss`  `axios` 
 
 ### Screenshots
 <img src="https://github.com/Y2theK/ecom/blob/master/frontend/src/assets/image/home.png" width=50% height=50% alt= "Home">
