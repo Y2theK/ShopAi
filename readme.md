@@ -4,20 +4,22 @@
 A Multi-User Order & Inventory System (Mini SaaS Style).
 
 1. Authentication
-• Login System: Implemented basic login using Laravel Sanctum (SPA).
-• All authenticated users have the same permissions to view products and create
+- Login System: Implemented basic login using Laravel Sanctum (SPA).
+- All authenticated users have the same permissions to view products and create
 orders.
 
 2. Database Design
-• users: id, name, email, password.
-• products: id, name, price, stock.
-• orders: id, user_id, total_price.
-• order_items: id, order_id, product_id, quantity, price.
+   
+- users: id, name, email, password.
+- products: id, name, price, stock.
+- orders: id, user_id, total_price.
+- order_items: id, order_id, product_id, quantity, price.
 
 3. Backend API (Laravel)
-• Auth APIs: Basic login and logout endpoints.
-• Product List: A simple GET endpoint to retrieve available products.
-• Order Creation: A POST endpoint to submit a new order.
+   
+- Auth APIs: Basic login and logout endpoints.
+- Product List: A simple GET endpoint to retrieve available products.
+- Order Creation: A POST endpoint to submit a new order.
 
 ### Tech Stacks:
 `Laravel 11` `sqlite` `vue 3`  `tailwindcss`  `axios` 
