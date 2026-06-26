@@ -168,17 +168,29 @@ function formatCurrency(value: number) {
                   </span>
                 </div>
 
-                <label class="quantity-control">
+                <div class="quantity-control">
                   <span>Qty</span>
-                  <input
-                    :value="selectedQuantities[product.id] ?? 0"
-                    type="number"
-                    min="0"
-                    :max="product.stock"
-                    :disabled="product.stock === 0 || placingOrder"
-                    @input="updateQuantity(product.id, Number(($event.target as HTMLInputElement).value))"
-                  />
-                </label>
+                  <div class="quantity-stepper">
+                    <button
+                      class="step-btn"
+                      :disabled="(selectedQuantities[product.id] ?? 0) <= 0 || placingOrder"
+                      @click="updateQuantity(product.id, (selectedQuantities[product.id] ?? 1) - 1)"
+                    >−</button>
+                    <input
+                      :value="selectedQuantities[product.id] ?? 0"
+                      type="number"
+                      min="0"
+                      :max="product.stock"
+                      :disabled="product.stock === 0 || placingOrder"
+                      @input="updateQuantity(product.id, Number(($event.target as HTMLInputElement).value))"
+                    />
+                    <button
+                      class="step-btn"
+                      :disabled="(selectedQuantities[product.id] ?? 0) >= product.stock || placingOrder"
+                      @click="updateQuantity(product.id, (selectedQuantities[product.id] ?? 0) + 1)"
+                    >+</button>
+                  </div>
+                </div>
               </article>
             </div>
           </div>
@@ -376,19 +388,64 @@ h1 {
   color: #e2e8f0;
 }
 
-.quantity-control input {
-  width: 100%;
-  padding: 12px 14px;
+.quantity-stepper {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 14px;
+  overflow: hidden;
   background: rgba(15, 23, 42, 0.9);
-  color: #f8fafc;
 }
 
-.quantity-control input:focus {
+.quantity-stepper input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #f8fafc;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  -moz-appearance: textfield;
+}
+
+.quantity-stepper input::-webkit-inner-spin-button,
+.quantity-stepper input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.quantity-stepper input:focus {
   outline: none;
-  border-color: #818cf8;
-  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.18);
+  box-shadow: inset 0 0 0 2px #818cf8;
+}
+
+.step-btn {
+  height: 40px;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.step-btn:hover:not(:disabled) {
+  background: rgba(129, 140, 248, 0.15);
+  color: #818cf8;
+}
+
+.step-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .totals {
