@@ -3,13 +3,15 @@ import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuth } from '../services/auth'
-import { fetchProducts, getErrorMessage, placeOrder, type Product } from '../services/dashboard'
+import { fetchCategories, fetchProducts, getErrorMessage, placeOrder, type Category, type Product } from '../services/dashboard'
 
 const auth = useAuth()
 const user = auth.user
 const router = useRouter()
 
 const products = ref<Product[]>([])
+const categories = ref<Category[]>([])
+const activeCategory = ref('')
 const selectedQuantities = ref<Record<number, number>>({})
 const loadingProducts = ref(false)
 const placingOrder = ref(false)
@@ -44,7 +46,7 @@ const canPlaceOrder = computed(() =>
 )
 
 onMounted(async () => {
-  await loadProducts()
+  await Promise.all([loadProducts(), loadCategories()])
 })
 
 async function handleLogout() {
@@ -57,7 +59,7 @@ async function loadProducts() {
   errorMessage.value = ''
 
   try {
-    products.value = await fetchProducts()
+    products.value = await fetchProducts(activeCategory.value || undefined)
     selectedQuantities.value = {}
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -70,6 +72,21 @@ async function loadProducts() {
   } finally {
     loadingProducts.value = false
   }
+}
+
+async function loadCategories() {
+  try {
+    categories.value = await fetchCategories()
+  } catch {
+    categories.value = []
+  }
+}
+
+async function selectCategory(slug: string) {
+  if (activeCategory.value === slug || loadingProducts.value) return
+
+  activeCategory.value = slug
+  await loadProducts()
 }
 
 function updateQuantity(productId: number, quantity: number) {
@@ -158,12 +175,30 @@ function formatCurrency(value: number) {
               </button>
             </div>
 
+            <nav v-if="categories.length > 0" class="category-tabs" aria-label="Filter products by category">
+              <button
+                type="button"
+                class="category-tab"
+                :class="{ active: activeCategory === '' }"
+                @click="selectCategory('')"
+              >All</button>
+              <button
+                v-for="category in categories"
+                :key="category.id"
+                type="button"
+                class="category-tab"
+                :class="{ active: activeCategory === category.slug }"
+                @click="selectCategory(category.slug)"
+              >{{ category.name }}</button>
+            </nav>
+
             <p v-if="loadingProducts" class="status-message">Loading products...</p>
             <p v-else-if="products.length === 0" class="status-message">No products are available.</p>
 
             <div v-else class="product-list">
               <article v-for="product in products" :key="product.id" class="product-row">
                 <div class="product-copy">
+                  <span v-if="product.category" class="category-label">{{ product.category.name }}</span>
                   <h3>{{ product.name }}</h3>
                   <p>{{ formatCurrency(product.price) }}</p>
                   <span class="stock-badge" :class="{ low: product.stock <= 3 }">
@@ -330,6 +365,34 @@ h1 {
   color: #818cf8;
 }
 
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.category-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.category-tab:hover:not(:disabled) {
+  background: rgba(129, 140, 248, 0.15);
+  color: #a5b4fc;
+  transform: none;
+}
+
+.category-tab.active {
+  background: rgba(129, 140, 248, 0.22);
+  color: #c7d2fe;
+  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.5);
+}
+
 .product-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -366,6 +429,14 @@ h1 {
 .status-message,
 .totals dt {
   color: rgba(226, 232, 240, 0.72);
+}
+
+.category-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #818cf8;
 }
 
 .stock-badge {

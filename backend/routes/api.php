@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminChatController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
@@ -18,6 +19,7 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::get('/products', [ProductController::class, 'index']);
+        Route::get('/categories', [CategoryController::class, 'index']);
         Route::post('/orders', [OrderController::class, 'store']);
         Route::post('/chat', [ChatController::class, 'chat'])->middleware('throttle:chat');
         Route::post('/admin/chat', [AdminChatController::class, 'chat'])->middleware(['admin', 'throttle:admin-chat']);

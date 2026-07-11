@@ -57,7 +57,7 @@ export function useChat() {
     }
   }
 
-  async function sendMessage(text: string) {
+  async function sendMessage(text: string, options?: { hideProducts?: boolean }) {
     if (!text.trim() || state.isLoading) {
       return
     }
@@ -79,7 +79,7 @@ export function useChat() {
         id: uuid(),
         role: 'assistant',
         content: data.reply,
-        products: data.products?.length ? data.products : undefined,
+        products: !options?.hideProducts && data.products?.length ? data.products : undefined,
       })
 
       state.conversationId = data.conversation_id

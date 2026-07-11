@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Ai\AgentContext;
 use App\Ai\Tools\PlaceOrderTool;
+use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
@@ -19,7 +21,7 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
 
-        $result = (string) (new PlaceOrderTool($user))->handle(new Request([
+        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
         ]));
 
@@ -33,7 +35,7 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 100]);
 
-        $result = (string) (new PlaceOrderTool($user))->handle(new Request([
+        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 21]],
         ]));
 
@@ -49,7 +51,7 @@ class PlaceOrderToolTest extends TestCase
 
         $items = $products->map(fn (Product $p) => ['product_id' => $p->id, 'quantity' => 1])->all();
 
-        $result = (string) (new PlaceOrderTool($user))->handle(new Request(['items' => $items]));
+        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request(['items' => $items]));
 
         $this->assertStringContainsString('at most 10 different products', $result);
         $this->assertSame(0, Order::count());
@@ -60,7 +62,7 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['price' => 10, 'stock' => 100]);
 
-        $result = (string) (new PlaceOrderTool($user))->handle(new Request([
+        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
             'items' => [
                 ['product_id' => $product->id, 'quantity' => 1],
                 ['product_id' => $product->id, 'quantity' => 2],
@@ -71,12 +73,56 @@ class PlaceOrderToolTest extends TestCase
         $this->assertSame(0, Order::count());
     }
 
+    public function test_a_successful_order_suggests_other_popular_items(): void
+    {
+        $user = User::factory()->create();
+        $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
+        Product::factory()->create(['name' => 'Keyboard', 'price' => 40, 'stock' => 30]);
+
+        $context = new AgentContext;
+
+        $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
+            'items' => [['product_id' => $product->id, 'quantity' => 1]],
+        ]));
+
+        $this->assertStringContainsString('might also like', $result);
+        $this->assertStringContainsString('Keyboard', $result);
+        $this->assertStringNotContainsString('- Mouse', $result);
+
+        $suggestedNames = array_column($context->getProducts(), 'name');
+        $this->assertContains('Keyboard', $suggestedNames);
+        $this->assertNotContains('Mouse', $suggestedNames);
+    }
+
+    public function test_suggestions_come_from_the_same_category_as_the_order(): void
+    {
+        $user = User::factory()->create();
+        $electronics = Category::factory()->create(['name' => 'Electronics', 'slug' => 'electronics']);
+        $clothing = Category::factory()->create(['name' => 'Clothing', 'slug' => 'clothing']);
+        $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50, 'category_id' => $electronics->id]);
+        Product::factory()->create(['name' => 'Keyboard', 'price' => 40, 'stock' => 30, 'category_id' => $electronics->id]);
+        Product::factory()->create(['name' => 'T-Shirt', 'price' => 15, 'stock' => 80, 'category_id' => $clothing->id]);
+
+        $context = new AgentContext;
+
+        $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
+            'items' => [['product_id' => $product->id, 'quantity' => 1]],
+        ]));
+
+        $this->assertStringContainsString('Keyboard', $result);
+        $this->assertStringNotContainsString('T-Shirt', $result);
+
+        $suggestedNames = array_column($context->getProducts(), 'name');
+        $this->assertContains('Keyboard', $suggestedNames);
+        $this->assertNotContains('T-Shirt', $suggestedNames);
+    }
+
     public function test_orders_above_the_total_cap_are_rejected(): void
     {
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Server Rack', 'price' => 6000, 'stock' => 10]);
 
-        $result = (string) (new PlaceOrderTool($user))->handle(new Request([
+        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
         ]));
 

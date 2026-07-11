@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools;
 
+use App\Ai\AgentContext;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -21,7 +22,12 @@ class PlaceOrderTool implements Tool
 
     private const MAX_ORDER_TOTAL = 10_000.0;
 
-    public function __construct(private User $user) {}
+    private const MAX_SUGGESTIONS = 3;
+
+    public function __construct(
+        private User $user,
+        private AgentContext $context
+    ) {}
 
     public function description(): Stringable|string
     {
@@ -101,7 +107,35 @@ class PlaceOrderTool implements Tool
             return "{$product->name} x{$item['quantity']} (\${$product->price} each)";
         })->implode(', ');
 
-        return "Order #{$order->id} placed successfully! Items: {$summary}. Total: \${$total}.";
+        $result = "Order #{$order->id} placed successfully! Items: {$summary}. Total: \${$total}.";
+
+        $categoryIds = $products->pluck('category_id')->filter()->unique();
+
+        $suggestions = Product::with('category')
+            ->whereNotIn('id', $productIds)
+            ->where('stock', '>', 0)
+            ->when($categoryIds->isNotEmpty(), fn ($q) => $q->whereIn('category_id', $categoryIds))
+            ->bestSelling()
+            ->limit(self::MAX_SUGGESTIONS)
+            ->get();
+
+        if ($suggestions->isNotEmpty()) {
+            $suggestionLines = $suggestions->map(function (Product $product) {
+                $this->context->addProduct([
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'category' => $product->category?->name,
+                    'price' => (string) $product->price,
+                    'stock' => $product->stock,
+                ]);
+
+                return "- {$product->name} (\${$product->price})";
+            })->implode("\n");
+
+            $result .= "\nPopular items the user might also like — briefly suggest these:\n{$suggestionLines}";
+        }
+
+        return $result;
     }
 
     public function schema(JsonSchema $schema): array

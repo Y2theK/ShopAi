@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useChat } from '../services/chat'
+import { fetchCategories, type Category } from '../services/dashboard'
 import { renderMarkdown } from '../utils/markdown'
 
 const chat = useChat()
 const messageList = ref<HTMLElement | null>(null)
 const inputText = ref('')
+const categories = ref<Category[]>([])
 
-onMounted(() => {
+onMounted(async () => {
   chat.initFromStorage()
+
+  try {
+    categories.value = await fetchCategories()
+  } catch {
+    categories.value = []
+  }
 })
 
 async function scrollToBottom() {
@@ -36,7 +44,13 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 async function quickOrder(productName: string) {
-  await chat.sendMessage(`I'd like to order 1 ${productName}`)
+  // The reply is a confirmation prompt for this same product — order buttons there would restart the flow.
+  await chat.sendMessage(`I'd like to order 1 ${productName}`, { hideProducts: true })
+}
+
+async function quickCategory(categoryName: string) {
+  if (chat.isLoading.value) return
+  await chat.sendMessage(`Show me ${categoryName} products`)
 }
 </script>
 
@@ -93,6 +107,18 @@ async function quickOrder(productName: string) {
 
     <!-- Error -->
     <div v-if="chat.error.value" class="chat-error">{{ chat.error.value }}</div>
+
+    <!-- Quick-access categories -->
+    <div v-if="categories.length > 0" class="chat-category-row">
+      <button
+        v-for="category in categories"
+        :key="category.id"
+        type="button"
+        class="chat-category-chip"
+        :disabled="chat.isLoading.value"
+        @click="quickCategory(category.name)"
+      >{{ category.name }}</button>
+    </div>
 
     <!-- Input -->
     <div class="chat-input-bar">
@@ -381,6 +407,46 @@ async function quickOrder(productName: string) {
   color: #fca5a5;
   background: rgba(248, 113, 113, 0.1);
   border-top: 1px solid rgba(248, 113, 113, 0.15);
+}
+
+/* Quick-access categories */
+.chat-category-row {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid rgba(129, 140, 248, 0.15);
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.chat-category-row::-webkit-scrollbar {
+  display: none;
+}
+
+.chat-category-chip {
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.8);
+  color: rgba(226, 232, 240, 0.8);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chat-category-chip:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(129, 140, 248, 0.5);
+  color: #c7d2fe;
+}
+
+.chat-category-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Input */

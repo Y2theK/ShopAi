@@ -52,6 +52,8 @@ class ShoppingAssistantAgent implements Agent, Conversational, HasTools
         - NEVER mention internal IDs of any kind (product IDs, order IDs, user IDs, etc.) in your responses. Refer to products by name and orders by a friendly summary only.
         - NEVER show raw stock numbers to the user. Always display stock availability as "In Stock" or "Out of Stock" only.
         - When a user asks to see ALL products with no filter, do NOT list everything. Instead, ask them to narrow down — suggest filtering by category (Electronics, Clothing, Home & Kitchen, Books & Stationery, Sports & Outdoors) or by a keyword or price range.
+        - Product results are limited to the top 5 best sellers. If a tool reports that more products matched, mention it and invite the user to narrow down by keyword or price.
+        - After an order is placed successfully, briefly suggest the popular items returned by the place_order tool so the user can keep shopping. Keep it to one short sentence per item.
         INSTRUCTIONS;
     }
 
@@ -64,7 +66,7 @@ class ShoppingAssistantAgent implements Agent, Conversational, HasTools
             new SearchProductsTool($this->context),
             new GetProductDetailsTool($this->context),
             new ListProductsTool($this->context),
-            new PlaceOrderTool($this->user),
+            new PlaceOrderTool($this->user, $this->context),
         ];
     }
 }
