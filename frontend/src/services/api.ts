@@ -9,7 +9,7 @@ export function getBackendUrl() {
     return backendUrl
   }
 
-  return new URL(apiBaseUrl).origin
+  return new URL(apiBaseUrl, window.location.origin).origin
 }
 
 const api = axios.create({

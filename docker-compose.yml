@@ -1,0 +1,62 @@
+name: ecom
+
+# Shared definition for both Laravel containers (app + queue worker).
+x-backend: &backend
+  build: ./backend
+  environment:
+    APP_NAME: Ecom
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_KEY: "${APP_KEY:?APP_KEY is missing — copy .env.example to .env and set it (see .env.example)}"
+    APP_URL: http://localhost:8080
+    FRONTEND_URL: http://localhost:8080
+    SANCTUM_STATEFUL_DOMAINS: localhost:8080
+    DB_CONNECTION: sqlite
+    DB_DATABASE: /data/database.sqlite
+    SESSION_DRIVER: database
+    CACHE_STORE: database
+    QUEUE_CONNECTION: database
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: info
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  volumes:
+    - sqlite-data:/data
+    - storage-data:/var/www/storage/app
+
+services:
+  app:
+    <<: *backend
+    healthcheck:
+      # The entrypoint touches this file after migrations and caching finish.
+      test: ["CMD", "test", "-f", "/tmp/app-ready"]
+      interval: 3s
+      timeout: 2s
+      retries: 40
+      start_period: 5s
+
+  queue:
+    <<: *backend
+    command: ["php", "artisan", "queue:work", "--tries=1", "--max-time=3600"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/up"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  sqlite-data:
+  storage-data:

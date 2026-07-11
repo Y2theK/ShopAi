@@ -96,3 +96,26 @@ Visit http://localhost:8000 for backend api.
 | Test User | test@example.com | password |
 
 
+
+## Running with Docker
+
+Everything (backend, frontend, queue worker) runs behind one address: http://localhost:8080
+
+### First-time setup
+
+```shell
+cp .env.example .env       # then set APP_KEY (generate with: cd backend && php artisan key:generate --show)
+docker compose up --build -d
+docker compose exec app php artisan migrate:fresh --seed   # seed demo data
+```
+
+### Daily use
+
+```shell
+docker compose up -d       # start
+docker compose logs -f     # watch logs
+docker compose down        # stop (data survives in volumes)
+docker compose down -v     # stop AND delete the database volume
+```
+
+Log in at http://localhost:8080 with the demo credentials above.

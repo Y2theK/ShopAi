@@ -1,0 +1,27 @@
+.git
+vendor/
+node_modules/
+.env
+.env.backup
+.env.production
+storage/logs/*
+storage/pail
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+# Host-generated caches may reference dev-only packages that are not
+# installed in the image.
+bootstrap/cache/*.php
+database/*.sqlite
+database/*.sqlite-journal
+.phpunit.cache
+.phpunit.result.cache
+tests/
+docs/
+.claude/
+AGENTS.md
+CLAUDE.md
+boost.json
+opencode.json
+README.md
+Dockerfile
