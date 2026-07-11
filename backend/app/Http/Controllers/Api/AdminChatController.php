@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Ai\Agents\AdminAssistantAgent;
 use App\Ai\ChartContext;
+use App\Ai\PiiMasker;
 use App\Ai\PromptInjectionDetector;
 use App\Http\Controllers\Controller;
 use App\Traits\ApiResponseTrait;
@@ -34,6 +35,10 @@ class AdminChatController extends Controller
             ]);
         }
 
+        // Masked before the agent sees it, so the provider payload, the stored
+        // transcript, and every future history replay all get the masked text.
+        $message = (new PiiMasker)->mask($payload['message']);
+
         try {
             $context = new ChartContext;
             $agent = new AdminAssistantAgent($user, $context);
@@ -55,7 +60,7 @@ class AdminChatController extends Controller
                 $agent->forUser($user);
             }
 
-            $response = $agent->prompt($payload['message']);
+            $response = $agent->prompt($message);
 
             return $this->successResponse([
                 'reply' => (string) $response,

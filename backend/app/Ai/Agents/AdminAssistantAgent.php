@@ -3,6 +3,8 @@
 namespace App\Ai\Agents;
 
 use App\Ai\ChartContext;
+use App\Ai\Middleware\PiiLeakCanary;
+use App\Ai\PiiMasker;
 use App\Ai\Tools\BestSellingProductsTool;
 use App\Ai\Tools\CustomerSummaryTool;
 use App\Ai\Tools\InventorySummaryTool;
@@ -18,6 +20,7 @@ use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasMiddleware;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Promptable;
@@ -25,7 +28,7 @@ use Stringable;
 
 #[MaxSteps(10)]
 #[MaxTokens(3000)]
-class AdminAssistantAgent implements Agent, Conversational, HasTools
+class AdminAssistantAgent implements Agent, Conversational, HasMiddleware, HasTools
 {
     use Promptable, RemembersConversations;
 
@@ -56,6 +59,11 @@ class AdminAssistantAgent implements Agent, Conversational, HasTools
         - Do not mention internal database IDs except order numbers; refer to products and customers by name.
         - If the user asks a broad question like "how is the store doing?", combine the sales summary, best sellers, and monthly trend tools to give a complete picture.
         INSTRUCTIONS;
+    }
+
+    public function middleware(): array
+    {
+        return [new PiiLeakCanary(new PiiMasker)];
     }
 
     /**

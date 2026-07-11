@@ -3,7 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Models\Order;
-use App\Traits\MasksEmails;
+use App\Traits\MasksPii;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -11,7 +11,7 @@ use Stringable;
 
 class RecentOrdersTool implements Tool
 {
-    use MasksEmails;
+    use MasksPii;
 
     public function description(): Stringable|string
     {

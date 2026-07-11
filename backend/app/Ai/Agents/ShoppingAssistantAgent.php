@@ -3,6 +3,8 @@
 namespace App\Ai\Agents;
 
 use App\Ai\AgentContext;
+use App\Ai\Middleware\PiiLeakCanary;
+use App\Ai\PiiMasker;
 use App\Ai\Tools\GetProductDetailsTool;
 use App\Ai\Tools\ListProductsTool;
 use App\Ai\Tools\PlaceOrderTool;
@@ -16,6 +18,7 @@ use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasMiddleware;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
@@ -26,7 +29,7 @@ use Stringable;
 // #[Model('google/gemma-4-31b-it:free')]
 #[MaxSteps(6)]
 #[MaxTokens(2000)]
-class ShoppingAssistantAgent implements Agent, Conversational, HasTools
+class ShoppingAssistantAgent implements Agent, Conversational, HasMiddleware, HasTools
 {
     use Promptable, RemembersConversations;
 
@@ -59,6 +62,11 @@ class ShoppingAssistantAgent implements Agent, Conversational, HasTools
         - Product results are limited to the top 5 best sellers. If a tool reports that more products matched, mention it and invite the user to narrow down by keyword or price.
         - After an order is placed successfully, briefly suggest the popular items returned by the place_order tool so the user can keep shopping. Keep it to one short sentence per item.
         INSTRUCTIONS;
+    }
+
+    public function middleware(): array
+    {
+        return [new PiiLeakCanary(new PiiMasker)];
     }
 
     /**
