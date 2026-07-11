@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useChat } from '../services/chat'
 import { fetchCategories, type Category } from '../services/dashboard'
 import { renderMarkdown } from '../utils/markdown'
@@ -8,6 +8,11 @@ const chat = useChat()
 const messageList = ref<HTMLElement | null>(null)
 const inputText = ref('')
 const categories = ref<Category[]>([])
+const isCartOpen = ref(false)
+
+const lastMessageId = computed(
+  () => chat.messages.value[chat.messages.value.length - 1]?.id,
+)
 
 onMounted(async () => {
   chat.initFromStorage()
@@ -29,6 +34,16 @@ async function scrollToBottom() {
 watch(() => chat.messages.value.length, scrollToBottom)
 watch(() => chat.isLoading.value, scrollToBottom)
 
+// Close the panel when the cart empties so it doesn't pop open on the next add.
+watch(
+  () => chat.pendingItems.value.length,
+  (length) => {
+    if (length === 0) {
+      isCartOpen.value = false
+    }
+  },
+)
+
 async function handleSend() {
   const text = inputText.value.trim()
   if (!text || chat.isLoading.value) return
@@ -43,9 +58,11 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-async function quickOrder(productName: string) {
-  // The reply is a confirmation prompt for this same product — order buttons there would restart the flow.
-  await chat.sendMessage(`I'd like to order 1 ${productName}`, { hideProducts: true })
+async function handleCheckout() {
+  // Collapse the cart detail once checkout is sent; items stay pending until
+  // the order is actually placed.
+  isCartOpen.value = false
+  await chat.checkoutOrder()
 }
 
 async function quickCategory(categoryName: string) {
@@ -84,17 +101,29 @@ async function quickCategory(categoryName: string) {
           <!-- eslint-disable-next-line vue/no-v-html -->
           <div class="bubble bubble--ai" v-html="renderMarkdown(msg.content)" />
 
-          <div v-if="msg.products?.length && !chat.isLoading.value" class="quick-order-row">
+          <div
+            v-if="msg.awaitingConfirmation && msg.id === lastMessageId && !chat.isLoading.value"
+            class="quick-order-row"
+          >
+            <button class="confirm-order-btn" @click="chat.confirmOrder()">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Confirm order
+            </button>
+          </div>
+
+          <div v-else-if="msg.products?.length && !chat.isLoading.value" class="quick-order-row">
             <button
               v-for="product in msg.products"
               :key="product.id"
               class="quick-order-btn"
-              @click="quickOrder(product.name)"
+              @click="chat.addToOrder(product)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
               </svg>
-              Order {{ product.name }}
+              Add {{ product.name }}
             </button>
           </div>
         </div>
@@ -107,6 +136,32 @@ async function quickCategory(categoryName: string) {
 
     <!-- Error -->
     <div v-if="chat.error.value" class="chat-error">{{ chat.error.value }}</div>
+
+    <!-- Pending order -->
+    <div v-if="isCartOpen && chat.pendingItems.value.length > 0" class="chat-cart">
+      <div v-for="item in chat.pendingItems.value" :key="item.id" class="chat-cart-item">
+        <span class="chat-cart-name">{{ item.name }}</span>
+        <div class="chat-cart-qty">
+          <button type="button" aria-label="Decrease quantity" @click="chat.updateQuantity(item.id, -1)">−</button>
+          <span>{{ item.quantity }}</span>
+          <button type="button" aria-label="Increase quantity" @click="chat.updateQuantity(item.id, 1)">+</button>
+        </div>
+        <button
+          type="button"
+          class="chat-cart-remove"
+          aria-label="Remove item"
+          @click="chat.removeFromOrder(item.id)"
+        >×</button>
+      </div>
+      <button
+        type="button"
+        class="chat-cart-checkout"
+        :disabled="chat.isLoading.value"
+        @click="handleCheckout"
+      >
+        Place order · ${{ chat.pendingTotal.value.toFixed(2) }}
+      </button>
+    </div>
 
     <!-- Quick-access categories -->
     <div v-if="categories.length > 0" class="chat-category-row">
@@ -130,6 +185,18 @@ async function quickCategory(categoryName: string) {
         :disabled="chat.isLoading.value"
         @keydown="handleKeydown"
       />
+      <button
+        type="button"
+        class="chat-cart-btn"
+        :class="{ 'chat-cart-btn--active': isCartOpen }"
+        aria-label="Toggle pending order"
+        @click="isCartOpen = !isCartOpen"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+        <span v-if="chat.pendingCount.value > 0" class="chat-cart-badge">{{ chat.pendingCount.value }}</span>
+      </button>
       <button
         class="chat-send-btn"
         :disabled="chat.isLoading.value || !inputText.trim()"
@@ -366,6 +433,138 @@ async function quickCategory(categoryName: string) {
   transform: translateY(-1px);
 }
 
+.confirm-order-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.confirm-order-btn:hover {
+  background: rgba(34, 197, 94, 0.28);
+  border-color: rgba(74, 222, 128, 0.65);
+  transform: translateY(-1px);
+}
+
+/* Pending order */
+.chat-cart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  max-height: 150px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(129, 140, 248, 0.15);
+  background: rgba(30, 41, 59, 0.75);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(129, 140, 248, 0.25) transparent;
+}
+
+.chat-cart-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #e2e8f0;
+}
+
+.chat-cart-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-cart-qty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-cart-qty button {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-cart-qty button:hover {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+}
+
+.chat-cart-qty span {
+  min-width: 16px;
+  text-align: center;
+  font-weight: 700;
+  color: #c7d2fe;
+}
+
+.chat-cart-remove {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.5);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-cart-remove:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
+}
+
+.chat-cart-checkout {
+  margin-top: 2px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.chat-cart-checkout:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.chat-cart-checkout:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .bubble--ai :deep(.stock-out) {
   display: inline-block;
   padding: 2px 8px;
@@ -482,6 +681,47 @@ async function quickCategory(categoryName: string) {
 
 .chat-input:disabled {
   opacity: 0.5;
+}
+
+.chat-cart-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.chat-cart-btn:hover,
+.chat-cart-btn--active {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(129, 140, 248, 0.6);
+  color: #c7d2fe;
+}
+
+.chat-cart-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.5);
 }
 
 .chat-send-btn {

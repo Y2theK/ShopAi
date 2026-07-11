@@ -61,6 +61,7 @@ class ChatController extends Controller
                 'reply' => (string) $response,
                 'conversation_id' => $response->conversationId,
                 'products' => $context->getProducts(),
+                'order_placed' => $context->orderWasPlaced(),
             ]);
         } catch (Throwable $e) {
             Log::error('Shopping assistant chat failed', [

@@ -101,6 +101,8 @@ class PlaceOrderTool implements Tool
 
         Cache::tags(['products'])->flush();
 
+        $this->context->markOrderPlaced();
+
         $summary = collect($items)->map(function ($item) use ($products) {
             $product = $products[$item['product_id']];
 

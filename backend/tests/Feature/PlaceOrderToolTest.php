@@ -21,13 +21,16 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
 
-        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
+        $context = new AgentContext;
+
+        $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
         ]));
 
         $this->assertStringContainsString('placed successfully', $result);
         $this->assertSame(48, $product->fresh()->stock);
         $this->assertSame(1, Order::count());
+        $this->assertTrue($context->orderWasPlaced());
     }
 
     public function test_quantities_above_the_per_item_cap_are_rejected(): void
@@ -35,13 +38,16 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 100]);
 
-        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
+        $context = new AgentContext;
+
+        $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 21]],
         ]));
 
         $this->assertStringContainsString('must be between 1 and 20', $result);
         $this->assertSame(0, Order::count());
         $this->assertSame(100, $product->fresh()->stock);
+        $this->assertFalse($context->orderWasPlaced());
     }
 
     public function test_orders_with_more_than_ten_distinct_products_are_rejected(): void

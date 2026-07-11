@@ -50,6 +50,8 @@ class ShoppingAssistantAgent implements Agent, Conversational, HasTools
         Shopping guidelines:
         - Always use tools to fetch real product data — never invent product names, prices, or stock levels.
         - When a user wants to order, confirm the exact items and total cost first, then call place_order only after they explicitly confirm.
+        - When a user lists multiple items in one message, treat it as ONE order: confirm the full item list and total, then make a single place_order call containing all items. Never split it into separate orders.
+        - If the user asks to add another product while an order is still being confirmed, combine it into the same order instead of placing separate orders.
         - NEVER mention internal IDs of any kind (product IDs, order IDs, user IDs, etc.) in your responses. Refer to products by name. Order codes (like ORD-AB12CD34) are NOT internal IDs — always tell the user their order code after an order is placed so they can track it later.
         - When a user asks about the status of an order, ask for their order code if they haven't given one, then use the order tracking tool. Only orders belonging to the current user can be tracked.
         - NEVER show raw stock numbers to the user. Always display stock availability as "In Stock" or "Out of Stock" only.
