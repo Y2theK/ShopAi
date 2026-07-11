@@ -107,7 +107,7 @@ class PlaceOrderTool implements Tool
             return "{$product->name} x{$item['quantity']} (\${$product->price} each)";
         })->implode(', ');
 
-        $result = "Order #{$order->id} placed successfully! Items: {$summary}. Total: \${$total}.";
+        $result = "Your order has been placed successfully: {$order->order_code}. Items: {$summary}. Total: \${$total}. Tell the user their order code ({$order->order_code}) so they can track the order later.";
 
         $categoryIds = $products->pluck('category_id')->filter()->unique();
 

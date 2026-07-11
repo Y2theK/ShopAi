@@ -19,6 +19,12 @@ const router = createRouter({
       meta: { guestOnly: true },
     },
     {
+      path: '/orders',
+      name: 'orders',
+      component: () => import('../views/OrdersView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/admin',
       name: 'admin',
       component: () => import('../views/AdminAssistantView.vue'),

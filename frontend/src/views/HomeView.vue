@@ -149,6 +149,7 @@ function formatCurrency(value: number) {
         </div>
 
         <div class="hero-actions">
+          <RouterLink to="/orders" class="reports-link">My Orders</RouterLink>
           <RouterLink v-if="auth.isAdmin.value" to="/admin" class="reports-link">Admin Assistant</RouterLink>
           <button type="button" class="logout-button" @click="handleLogout">Logout</button>
         </div>

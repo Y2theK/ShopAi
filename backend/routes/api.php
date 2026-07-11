@@ -20,6 +20,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::get('/products', [ProductController::class, 'index']);
         Route::get('/categories', [CategoryController::class, 'index']);
+        Route::get('/orders', [OrderController::class, 'index']);
         Route::post('/orders', [OrderController::class, 'store']);
         Route::post('/chat', [ChatController::class, 'chat'])->middleware('throttle:chat');
         Route::post('/admin/chat', [AdminChatController::class, 'chat'])->middleware(['admin', 'throttle:admin-chat']);

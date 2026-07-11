@@ -17,6 +17,22 @@ class OrderController extends Controller
 {
     use ApiResponseTrait;
 
+    public function index(Request $request): JsonResponse
+    {
+        $perPage = min(100, max(1, (int) $request->query('per_page', 15)));
+
+        $orders = $request->user()->orders()
+            ->with('items.product')
+            ->latest('id')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return $this->successResponse([
+            'data' => OrderResource::collection($orders)->resolve(),
+            'meta' => $this->getpaginatedMeta($orders),
+        ], 'Orders retrieved successfully!');
+    }
+
     public function store(Request $request): JsonResponse
     {
         $payload = $request->validate([
@@ -74,6 +90,10 @@ class OrderController extends Controller
 
         $order->load('items.product');
 
-        return $this->successResponse(new OrderResource($order), 'Order created successfully!', 201);
+        return $this->successResponse(
+            new OrderResource($order),
+            "Your order has been placed successfully: {$order->order_code}",
+            201
+        );
     }
 }
