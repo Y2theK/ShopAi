@@ -6,6 +6,7 @@ export type AuthUser = {
   id: number
   name: string
   email: string
+  is_admin: boolean
 }
 
 type AuthState = {
@@ -34,6 +35,7 @@ function isAuthUser(value: unknown): value is AuthUser {
     typeof candidate.id === 'number'
     && typeof candidate.name === 'string'
     && typeof candidate.email === 'string'
+    && typeof candidate.is_admin === 'boolean'
   )
 }
 
@@ -95,6 +97,7 @@ function setUser(user: AuthUser | null) {
 export function useAuth() {
   const user = computed(() => state.user)
   const isAuthenticated = computed(() => state.user !== null)
+  const isAdmin = computed(() => state.user?.is_admin === true)
   const isLoading = computed(() => state.loading)
   const isInitialized = computed(() => state.initialized)
 
@@ -197,6 +200,7 @@ export function useAuth() {
   return {
     user,
     isAuthenticated,
+    isAdmin,
     isLoading,
     isInitialized,
     setUser,

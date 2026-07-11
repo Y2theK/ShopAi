@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAuth } from '../services/auth'
 import { fetchProducts, getErrorMessage, placeOrder, type Product } from '../services/dashboard'
 
@@ -131,7 +131,10 @@ function formatCurrency(value: number) {
           </p>
         </div>
 
-        <button type="button" class="logout-button" @click="handleLogout">Logout</button>
+        <div class="hero-actions">
+          <RouterLink v-if="auth.isAdmin.value" to="/admin" class="reports-link">Admin Assistant</RouterLink>
+          <button type="button" class="logout-button" @click="handleLogout">Logout</button>
+        </div>
       </header>
 
       <p v-if="auth.isLoading.value || !auth.isInitialized.value" class="status-message">
@@ -506,6 +509,27 @@ button:hover:not(:disabled) {
 .logout-button {
   background: rgba(255, 255, 255, 0.08);
   color: #f8fafc;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reports-link {
+  padding: 13px 18px;
+  border-radius: 16px;
+  background: rgba(129, 140, 248, 0.14);
+  color: #a5b4fc;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.reports-link:hover {
+  transform: translateY(-1px);
+  background: rgba(129, 140, 248, 0.24);
 }
 
 .ghost-button {

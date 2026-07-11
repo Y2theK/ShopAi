@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mini SaaS-style e-commerce app. Laravel 12 REST API backend + Vue 3 TypeScript frontend. All users share the same permission level (no roles). Stack: Laravel 12, SQLite, Laravel Sanctum, Vue 3, Vite, Axios.
+Mini SaaS-style e-commerce app. Laravel 12 REST API backend + Vue 3 TypeScript frontend. Users share the same permission level except for an `is_admin` boolean flag on `users`, which gates admin-only features (the admin assistant agent). Stack: Laravel 12, SQLite, Laravel Sanctum, Vue 3, Vite, Axios.
 
 ## Commands
 
@@ -34,13 +34,15 @@ Controllers use `ApiResponseTrait` (`app/Traits/ApiResponseTrait.php`) for all J
 
 Order creation (`OrderController::store`) validates stock before writing, then wraps the Order + OrderItem inserts + stock decrement in a single `DB::transaction`.
 
+Two laravel/ai agents live in `app/Ai/Agents/`: `ShoppingAssistantAgent` (`POST /chat`, all users) and `AdminAssistantAgent` (`POST /admin/chat`, admin-only via the `admin` middleware alias → `EnsureUserIsAdmin`). Tools live in `app/Ai/Tools/`. Both use a side-channel context object (`AgentContext` collects products, `ChartContext` collects chart payloads) that tools populate during the run and the controller returns alongside the agent's text reply. The admin agent is read-only by design — its tools query sales, inventory, customers, and orders but never mutate data.
+
 ### Frontend
 
 `src/services/auth.ts` — module-level reactive singleton managing auth state. The `useAuth()` composable is used everywhere; do not create additional auth state. The `bootstrap()` method is idempotent (deduplicated with a promise) and is called in the router guard on every navigation.
 
 `src/services/api.ts` — preconfigured Axios instance with `withCredentials: true` and `withXSRFToken: true` for Sanctum CSRF handling. Always import this `api` instance, not raw `axios`, for authenticated requests.
 
-Router (`src/router/index.ts`) uses `meta.requiresAuth` and `meta.guestOnly` guards; both are enforced via `router.beforeEach`.
+Router (`src/router/index.ts`) uses `meta.requiresAuth`, `meta.guestOnly`, and `meta.adminOnly` guards; all are enforced via `router.beforeEach`. `/admin` (admin-only) hosts the admin assistant chat with Chart.js visualizations (`ChartCard.vue` renders chart payloads from `ChartContext`).
 
 ### Auth Flow
 1. Frontend fetches `/sanctum/csrf-cookie` (via `ensureCsrfCookie`) before any login or bootstrap.
@@ -56,3 +58,4 @@ SQLite file at `backend/database/database.sqlite`. Schema: `users`, `products`, 
 - Backend: copy `backend/.env.example` → `backend/.env`, run `php artisan key:generate`
 - Frontend: copy `frontend/.env.example` → `frontend/.env`; set `VITE_API_BASE_URL` and `VITE_BACKEND_URL`
 - Demo login: `test@example.com` / `password`
+- Demo admin login: `admin@example.com` / `password`

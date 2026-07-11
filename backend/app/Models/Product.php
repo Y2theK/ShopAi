@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\OrderItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +24,11 @@ class Product extends Model
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function scopeLowStock(Builder $query, int $threshold = 5): Builder
+    {
+        return $query->where('stock', '<=', $threshold)->orderBy('stock');
     }
 
     public function scopeSearch(Builder $query, ?string $search = null): Builder
