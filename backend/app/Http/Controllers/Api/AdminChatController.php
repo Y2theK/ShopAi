@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Ai\Agents\AdminAssistantAgent;
 use App\Ai\ChartContext;
+use App\Ai\PromptInjectionDetector;
 use App\Http\Controllers\Controller;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +25,14 @@ class AdminChatController extends Controller
         ]);
 
         $user = $request->user();
+
+        if ($pattern = (new PromptInjectionDetector)->detect($payload['message'])) {
+            Log::warning('Possible prompt injection attempt', [
+                'user_id' => $user->id,
+                'pattern' => $pattern,
+                'endpoint' => 'admin-chat',
+            ]);
+        }
 
         try {
             $context = new ChartContext;

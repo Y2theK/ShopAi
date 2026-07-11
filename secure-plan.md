@@ -1,124 +1,77 @@
-Rate Limiting, Security Hardening & Caching for AI-Agent E-commerce App
+# Rate Limiting, Security Hardening & Caching — AI-Agent E-commerce App
 
-Context
+Implemented 2026-07-11 in two rounds. All measures verified: 48 backend tests passing, frontend type-checks + builds, Redis tags confirmed live, prune job on the daily schedule.
 
-The API currently has no rate limiting at all (even /auth/login is unthrottled), the chat endpoints hit paid LLM APIs with no per-user budget, chat controllers leak raw exception messages to clients, PlaceOrderTool accepts unbounded quantities/item counts from LLM output, and nothing is cached (product listing and admin analytics aggregates hit SQLite on every call). Goal: production-grade guardrails appropriate for an AI-agent-powered e-commerce API.
+## Context
 
-User decisions: Redis for cache + rate limiting · security scope = AI agent guardrails + auth hardening (explicitly NOT HTTP security headers) · cache scope = products + admin analytics.
+Before this work the API had **no rate limiting at all** (login included), the chat endpoints hit paid LLM APIs with no per-user budget, chat controllers leaked raw exception messages to clients, `PlaceOrderTool` accepted unbounded quantities from LLM output, nothing was cached, customer PII flowed unmasked to OpenAI, and conversation history accumulated in plaintext forever.
 
-Verified facts: framework is Laravel 13.x; phpunit.xml sets CACHE_STORE=array (array store supports tags, so tests need no Redis); phpredis extension not installed → use predis; laras]/#[MaxTokens] attributes; named rate limiters mayreturn an array of Limits (multi-window in one limiter); IntegerType/ArrayType support min()/max(); config/cors.php has empty
-exposed_headers so the frontend can't read Retry-Afe-line change.
+Guiding principle: **prompt-level rules are advice, code-level caps are law.** Assume the model can be talked into anything; make the blast radius small.
 
-Phase 1 — Redis via predis
+## Round 1 — Rate limiting, agent guardrails, caching
 
-1. cd backend && composer require predis/predis
-2. backend/.env + backend/.env.example: CACHE_STORE=redis, REDIS_CLIENT=predis (host/port scaffolding already present). Sessions stay
-on database (out of scope).
-3. No config file changes needed — config/cache.php already defines the redis store; the rate limiter uses the default cache store.
-4. Tests keep CACHE_STORE=array (tags work).
+### Infrastructure
+- Redis via `predis/predis` for cache + rate limiting: `CACHE_STORE=redis`, `REDIS_CLIENT=predis` in `.env`/`.env.example`. Sessions stay on `database`.
+- Tests keep `CACHE_STORE=array` (array store supports tags — no Redis needed to run the suite).
+- ⚠️ Local dev must use `redis` or `array` for cache — the `database` store throws on `Cache::tags()`.
 
-Phase 2 — Rate limiting
+### Rate limiting (`app/Providers/AppServiceProvider.php` + `routes/api.php`)
+| Limiter | Limits | Keyed by |
+|---|---|---|
+| `login` | 5/min | email + IP (brute-force pair; neither IP-rotation nor victim-lockout works) |
+| `api` | 60/min | user id (IP fallback) |
+| `chat` | 10/min **+ 50/day** | user id — the daily window is the LLM spend budget |
+| `admin-chat` | 20/min + 200/day | user id |
 
-2a. Limiter definitions in backend/app/Providers/Ap
+- Multi-window = one limiter returning an array of `Limit`s with `minute:`/`day:` key prefixes.
+- Route order: `auth:sanctum` **before** `throttle:api` so the limiter sees `$request->user()`.
+- 429s render through the `ApiResponseTrait` envelope via `->withExceptions()` in `bootstrap/app.php`, preserving `Retry-After`; that header is CORS-exposed (`config/cors.php`) so the SPA can show a countdown (`chat.ts` / `adminChat.ts`).
 
-RateLimiter::for('login', fn (Request $r) =>
-    Limit::perMinute(5)->by(Str::lower((string) $r->input('email')).'|'.$r->ip()));
+### AI agent guardrails
+- `PlaceOrderTool`: max 20 units/item, 10 distinct products, no duplicate lines, $10,000 order total. Enforced in the JSON schema **and** re-validated in `handle()` (providers don't reliably honor schemas). Checks run before the DB transaction; rejections return friendly strings so the agent can explain, never throw.
+- `#[MaxSteps(6)] #[MaxTokens(2000)]` on `ShoppingAssistantAgent`; `#[MaxSteps(10)] #[MaxTokens(3000)]` on `AdminAssistantAgent` — hard ceilings on the tool loop and reply size. Token values are tunable; raise if replies truncate.
+- Exception leakage fixed in both chat controllers: full exception + user_id to the log, generic message to the client.
+- `conversation_id` validated as UUID (server-issued; anything else is garbage input → 422).
 
-RateLimiter::for('api', fn (Request $r) =>
-    Limit::perMinute(60)->by($r->user()?->id ?? $r-
+### Caching
+- `ProductController::index`: `Cache::tags(['products'])`, 60s TTL, key = `md5(search):page:perPage`, `per_page` clamped 1–100. Flushed after order placement in **both** `OrderController::store` and `PlaceOrderTool` (stock must be fresh after purchases).
+- Admin analytics tools wrapped by `app/Ai/Concerns/CachesToolResults.php` (5-min TTL, `ai-tools` tag). Subtlety: on a cache hit the tool body never runs, so the trait stores `[result, charts]` and **replays the Chart.js payloads into `ChartContext`** — otherwise charts silently vanish on repeat questions.
+- Deliberately uncached: `ProductLookupTool` (arbitrary search terms), `RecentOrdersTool` (freshness-sensitive).
 
-RateLimiter::for('chat', function (Request $r) {
-    $key = $r->user()?->id ?? $r->ip();
-    return [
-        Limit::perMinute(10)->by('minute:'.$key),
-        Limit::perDay(50)->by('day:'.$key),      //
-    ];
-});
+## Round 2 — PII, retention, XSS, injection detection
 
-RateLimiter::for('admin-chat', function (Request $r
-    $key = $r->user()?->id ?? $r->ip();
-    return [Limit::perMinute(20)->by('minute:'.$keyy:'.$key)];
-});
+### PII masking (`app/Traits/MasksEmails.php`)
+`TopCustomersTool` and `RecentOrdersTool` emit `Jane Doe (j***@example.com)` — names kept for admin utility, raw emails never reach OpenAI, conversation storage, or the tool-result cache (masking happens inside the compute, before caching).
 
-2b. Routes (backend/routes/api.php): throttle:login on POST /login; throttle:api added alongside auth:sanctum on the main group AND the
-/auth/me+/auth/logout group (auth before throttle s throttle:chat on /chat; throttle:admin-chat on/admin/chat (stacks with throttle:api — intended).
+### Retention (`app/Console/Commands/PruneAgentConversations.php`)
+`ai:prune-conversations {--days=30}` deletes conversations inactive past the window — messages deleted explicitly since `agent_conversation_messages` has **no cascading FK**. Scheduled daily in `routes/console.php`.
 
-2c. Consistent 429 envelope — in backend/bootstrap/app.php ->withExceptions(), render ThrottleRequestsException for api/* requests as
-the ApiResponseTrait-shaped JSON (code: 429, succesafter seconds, time), passing $e->getHeaders() throughso Retry-After/X-RateLimit-* are preserved.
+### XSS safety net (`frontend/src/utils/markdown.ts`)
+Assistant replies render via `v-html` through a hand-rolled markdown renderer that escapes entities before emitting tags — safe today, but it was the *only* defense. `renderMarkdown()` output now passes through **DOMPurify** with an allowlist of exactly the emitted tags (`p, br, table, tr, th, td, strong, em, code, span` + `class`), protecting against future renderer regressions.
 
-2d. backend/config/cors.php: 'exposed_headers' => ['Retry-After'] — required for the frontend countdown (functional need, not the
-deselected headers scope).
+### Prompt-injection detection (`app/Ai/PromptInjectionDetector.php`)
+11 named patterns ("ignore previous instructions", "system prompt", "developer mode", …). Both chat controllers log `Log::warning` with user_id + pattern name + endpoint — **never the message content** (the log must not become a PII sink). Detection is advisory: requests proceed, the model refuses, you gain visibility into probing. Containment stays code-level (read-only admin tools, order caps, budgets).
 
-Phase 3 — AI agent guardrails
+### Deliberately not added
+- **Injection blocking** — regex blocking is easily bypassed and false-positives on legitimate messages; theater.
+- **Masking customer names** — would gut the admin assistant's usefulness; emails were the sensitive part.
+- **Encrypting conversation content** — requires overriding the vendor `ConversationMessage` model; retention pruning covers the main risk. Revisit if compliance demands it.
+- **HTTP security headers / CSP** — explicitly descoped by user decision.
 
-3a. backend/app/Ai/Tools/PlaceOrderTool.php — const20, MAX_DISTINCT_ITEMS = 10, MAX_ORDER_TOTAL =10_000.0. Enforce in the JSON schema (->min(1)->max(...) on quantity int and items array) AND in handle() (defense in depth — providers
-don't always honor schemas): reject >10 items, duple 1–20 (check before the stock check atPlaceOrderTool.php:42), total > cap before DB::transaction (line 49). Rejections return friendly strings (the tool's existing error
-style), never throw.
+## Test coverage (all in `backend/tests/`)
+- `RateLimitTest` — login/chat/admin-chat 429s, envelope shape, per-email key isolation (chat tests spam empty payloads: throttle runs before validation, so no LLM call).
+- `PlaceOrderToolTest` — every cap, asserting zero DB writes on rejection.
+- `ProductCacheTest` — TTL behavior, tag flush on order, distinct keys per query.
+- `AdminToolCachingTest` — cached result identity + chart replay on hit.
+- `PiiMaskingTest` — masked output in both tools + helper edge cases.
+- `PruneAgentConversationsTest` — stale pruned with messages, fresh retained, `--days` override.
+- `Unit/PromptInjectionDetectorTest` — pattern hits + benign-message false-positive checks.
 
-3b. Agent caps — add #[MaxSteps(6)] #[MaxTokens(200, #[MaxSteps(10)] #[MaxTokens(3000)] toAdminAssistantAgent (Laravel\Ai\Attributes\*). Token numbers are conservative guesses — raise if replies truncate.
-
-3c. Fix exception leakage in ChatController.php and AdminChatController.php catch blocks: Log::error(...) with user_id + exception,
-return generic errorResponse('The assistant is unav again shortly.', 500).
-
-3d. Tighten conversation_id validation to ['nullabl chat controllers (IDs are server-issued UUIDs;malformed → 422 instead of silently starting a new conversation).
-
-Phase 4 — Caching
-
-4a. ProductController::index — Cache::tags(['products'])->remember(...) keyed by md5(search):page:perPage, TTL 60s; clamp per_page to
-1–100 (also bounds key cardinality). Cache the reso::collection($products)->resolve() + meta), notresource objects. Rationale: ProductResource exposes stock, which changes on every order → tag-flush for immediacy, TTL bounds
-staleness from out-of-band edits.
-
-Invalidation: Cache::tags(['products'])->flush() afrderController::store and PlaceOrderTool::handle.
-
-4b. New trait backend/app/Ai/Concerns/CachesToolRes, Closure $compute, int $ttl = 300, ?ChartContext$context = null): string using Cache::tags(['ai-tools']) with manual get/put. Critical subtlety: on a cache hit the tool body never
-runs, so ChartContext::addChart() never fires and tx: on miss, diff $context->getCharts() countbefore/after compute, store ['result' => ..., 'charts' => ...]; on hit, replay stored charts into the context via addChart().
-
-4c. Apply to admin analytics tools — wrap each handle() body: extract to private compute(), call
-$this->cached("admin-tools:<name>:<params>", fn () $this->context). Apply to: SalesSummaryTool (key bydays), MonthlySalesTrendTool (months), BestSellingProductsTool, InventorySummaryTool, TopCustomersTool, CustomerSummaryTool,
-LowStockProductsTool. Tools without ChartContext paol (arbitrary search terms) and RecentOrdersTool(freshness-sensitive). TTL-only expiry — 5-min-stale analytics is acceptable; admin-only so no per-user key.
-
-Phase 5 — Frontend 429 UX
-
-frontend/src/services/chat.ts + adminChat.ts: in the existing catch, use isAxiosError(err) && err.response?.status === 429 → set
-state.error to "You're sending messages too quicklys." (fallback message if header missing/unreadable).Keep existing optimistic-message rollback. No interceptor, no component changes (ChatPopup.vue / AdminAssistantView.vue already render
-error).
-
-Phase 6 — Tests (backend/tests/Feature/, follow Admle)
-
-1. RateLimitTest.php — login: 5 bad attempts → 422,try-After; different email same IP still allowed. Chat: 10 empty-payload POSTs → 422 (throttle runs before validation — no LLM fake needed), 11th → 429. Admin chat: 21st → 429.
-2. PlaceOrderToolTest.php — direct tool invocation ejected, 11 items rejected, duplicate product_idsrejected, total-over-cap rejected (no Order rows created), valid order succeeds + decrements stock.
-3. ProductCacheTest.php — cached list omits newly cacing an order flushes the tag and the next GET seesfresh data; different search/page → distinct entries.
-4. AdminToolCachingTest.php — same tool+params twich → identical (cached) string AND second contextreceives replayed chart; different params bypass cache.
-
-Critical files
-
-- backend/app/Providers/AppServiceProvider.php — limiters
-- backend/routes/api.php + backend/bootstrap/app.ph render
-- backend/app/Ai/Tools/PlaceOrderTool.php — caps + cache flush
-- backend/app/Ai/Agents/{ShoppingAssistantAgent,Admeps/MaxTokens
-- backend/app/Http/Controllers/Api/{ChatController,AdminChatController}.php — error leak fix, uuid rule
-- backend/app/Http/Controllers/Api/ProductControlle cache + flush
-- backend/app/Ai/Concerns/CachesToolResults.php (new) + 7 admin tools
-- frontend/src/services/{chat,adminChat}.ts — 429 U
-- backend/.env, backend/.env.example, backend/config/cors.php
-
-Conventions (backend/CLAUDE.md)
-
-Run vendor/bin/pint --dirty --format agent after PHP edits; PHPUnit class tests via php artisan make:test --phpunit; run targeted tests
-with php artisan test --compact --filter=...; use Bchanges.
-
-Verification
-
-1. cd backend && php artisan test --compact (all nehe, no Redis needed).
-2. Start Redis (redis-server or docker) + redis-cli ping → PONG; php artisan config:clear.
-3. Manual: 6 rapid bad-credential logins via curl →r; spam the chat UI → rate-limit message withcountdown; redis-cli --scan --pattern '*products*' shows keys after GET /products and gone after placing an order; ask the admin
-assistant the same analytics question twice → secon rendered; force an agent error (bad API key) → generic 500 message in API, full exception in storage/logs/laravel.log.
-
-Caveats
-
-- Once Cache::tags() is in the code, local dev must run CACHE_STORE=redis (or array) — the database store throws on tags. .env change
-in Phase 1 handles this; flag it in the summary for
-- MaxTokens values are guesses; mechanism verified, numbers tunable.
-- New dependency predis/predis — approved via the u
-
-Plan approved — starting implementation. First, let meest-practices skill (required by backend/CLAUDE.md) and kick off the predis install in parallel.
+## Verification
+```bash
+cd backend && php artisan test --compact     # 48 passing, no Redis needed
+redis-cli ping                               # PONG required for local dev
+php artisan schedule:list                    # ai:prune-conversations daily
+cd frontend && npm run type-check && npm run build
+```
+Manual: 6 bad logins → 429 envelope with Retry-After; spam chat → countdown message; `redis-cli --scan --pattern '*products*'` keys vanish after placing an order; same admin analytics question twice → instant second reply with chart intact; forced agent error → generic 500, full trace in `storage/logs/laravel.log`.

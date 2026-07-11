@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Models\Order;
+use App\Traits\MasksEmails;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -10,6 +11,8 @@ use Stringable;
 
 class RecentOrdersTool implements Tool
 {
+    use MasksEmails;
+
     public function description(): Stringable|string
     {
         return 'List the most recent orders with customer, total, item count, and date. Optionally limit the number of orders (default 10), restrict to the last N days, or filter by customer name or email.';
@@ -41,7 +44,7 @@ class RecentOrdersTool implements Tool
 
         foreach ($orders as $order) {
             $total = number_format((float) $order->total_price, 2);
-            $customerName = $order->user ? "{$order->user->name} ({$order->user->email})" : 'Unknown customer';
+            $customerName = $order->user ? "{$order->user->name} ({$this->maskEmail($order->user->email)})" : 'Unknown customer';
             $date = $order->created_at->format('Y-m-d H:i');
 
             $lines[] = "Order #{$order->id} — {$customerName}: \${$total}, {$order->items_count} item(s), placed {$date}";

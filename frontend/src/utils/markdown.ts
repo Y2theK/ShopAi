@@ -1,4 +1,15 @@
+import DOMPurify from 'dompurify'
+
+// The renderer only ever emits these tags; DOMPurify strips anything else
+// as a safety net for future changes to the formatting logic below.
+const ALLOWED_TAGS = ['p', 'br', 'table', 'tr', 'th', 'td', 'strong', 'em', 'code', 'span']
+const ALLOWED_ATTR = ['class']
+
 export function renderMarkdown(text: string): string {
+  return DOMPurify.sanitize(render(text), { ALLOWED_TAGS, ALLOWED_ATTR })
+}
+
+function render(text: string): string {
   const lines = text.split('\n')
   const out: string[] = []
   let i = 0

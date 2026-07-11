@@ -249,7 +249,7 @@ class AdminToolsTest extends TestCase
 
         $result = (string) (new RecentOrdersTool)->handle(new Request);
 
-        $this->assertStringContainsString("Order #{$order->id} — Jane Doe (jane@example.com): $42.50, 2 item(s)", $result);
+        $this->assertStringContainsString("Order #{$order->id} — Jane Doe (j***@example.com): $42.50, 2 item(s)", $result);
     }
 
     public function test_recent_orders_filters_by_customer_name_or_email(): void

@@ -5,6 +5,7 @@ namespace App\Ai\Tools;
 use App\Ai\ChartContext;
 use App\Ai\Concerns\CachesToolResults;
 use App\Models\User;
+use App\Traits\MasksEmails;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -12,7 +13,7 @@ use Stringable;
 
 class TopCustomersTool implements Tool
 {
-    use CachesToolResults;
+    use CachesToolResults, MasksEmails;
 
     public function __construct(private ChartContext $context) {}
 
@@ -60,7 +61,8 @@ class TopCustomersTool implements Tool
 
         foreach ($customers as $customer) {
             $spent = number_format((float) $customer->total_spent, 2);
-            $lines[] = "{$customer->name} ({$customer->email}): \${$spent} across {$customer->orders_count} orders";
+            $maskedEmail = $this->maskEmail($customer->email);
+            $lines[] = "{$customer->name} ({$maskedEmail}): \${$spent} across {$customer->orders_count} orders";
         }
 
         return implode("\n", $lines);
