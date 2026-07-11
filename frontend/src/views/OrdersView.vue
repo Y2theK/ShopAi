@@ -48,6 +48,14 @@ function itemSummary(order: Order) {
     .join(', ')
 }
 
+function deliveryRegion(order: Order) {
+  return [order.city, order.state, order.country].filter(Boolean).join(', ')
+}
+
+function deliveryPhones(order: Order) {
+  return [order.phone, order.secondary_phone].filter(Boolean).join(' · ')
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -108,6 +116,7 @@ function formatDate(value: string | null) {
                 <th>Order Code</th>
                 <th>Placed</th>
                 <th>Items</th>
+                <th>Delivery</th>
                 <th class="numeric">Total</th>
                 <th>Status</th>
               </tr>
@@ -121,6 +130,14 @@ function formatDate(value: string | null) {
                     {{ itemCount(order) }} item{{ itemCount(order) === 1 ? '' : 's' }}
                     <small>{{ itemSummary(order) }}</small>
                   </span>
+                </td>
+                <td>
+                  <span v-if="order.address" class="delivery-summary">
+                    {{ order.address }}
+                    <small>{{ deliveryRegion(order) }}</small>
+                    <small v-if="deliveryPhones(order)">{{ deliveryPhones(order) }}</small>
+                  </span>
+                  <span v-else class="delivery-empty">—</span>
                 </td>
                 <td class="numeric">{{ formatCurrency(order.total_price) }}</td>
                 <td>
@@ -258,6 +275,21 @@ h2 {
 .item-summary small {
   color: rgba(226, 232, 240, 0.6);
   font-size: 0.82rem;
+}
+
+.delivery-summary {
+  display: grid;
+  gap: 4px;
+  max-width: 260px;
+}
+
+.delivery-summary small {
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 0.82rem;
+}
+
+.delivery-empty {
+  color: rgba(226, 232, 240, 0.4);
 }
 
 .status-badge {

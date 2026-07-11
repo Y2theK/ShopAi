@@ -25,6 +25,12 @@ class Order extends Model
         'order_code',
         'total_price',
         'status',
+        'phone',
+        'secondary_phone',
+        'address',
+        'city',
+        'state',
+        'country',
     ];
 
     protected $casts = [

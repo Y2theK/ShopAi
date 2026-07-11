@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools;
 
+use App\Ai\AgentContext;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -11,7 +12,10 @@ use Stringable;
 
 class TrackOrderTool implements Tool
 {
-    public function __construct(private User $user) {}
+    public function __construct(
+        private User $user,
+        private AgentContext $context
+    ) {}
 
     public function description(): Stringable|string
     {
@@ -37,11 +41,28 @@ class TrackOrderTool implements Tool
             return "- {$name} x{$item->quantity} (\${$item->price} each)";
         })->implode("\n");
 
-        return "Order {$order->order_code}\n"
+        $result = "Order {$order->order_code}\n"
             ."Status: {$order->status}\n"
             ."Placed: {$order->created_at->format('M j, Y g:i A')}\n"
             ."Total: \${$order->total_price}\n"
             ."Items:\n{$itemLines}";
+
+        if ($order->address) {
+            $this->context->setOrderInfo([
+                'order_code' => $order->order_code,
+                'status' => $order->status,
+                'phone' => $order->phone,
+                'secondary_phone' => $order->secondary_phone,
+                'address' => $order->address,
+                'city' => $order->city,
+                'state' => $order->state,
+                'country' => $order->country,
+            ]);
+
+            $result .= "\nThe delivery address is shown to the user separately — do not ask for it.";
+        }
+
+        return $result;
     }
 
     public function schema(JsonSchema $schema): array

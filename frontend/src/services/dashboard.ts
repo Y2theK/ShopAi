@@ -32,6 +32,12 @@ export type Order = {
   order_code: string
   status: string
   total_price: number
+  phone: string | null
+  secondary_phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  country: string | null
   created_at: string | null
   items: OrderItem[]
 }

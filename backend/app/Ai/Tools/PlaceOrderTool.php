@@ -76,10 +76,18 @@ class PlaceOrderTool implements Tool
             return 'This order exceeds the $'.number_format(self::MAX_ORDER_TOTAL).' assistant checkout limit. Please place it through the store checkout instead.';
         }
 
-        $order = DB::transaction(function () use ($items, $products, $total) {
+        $address = $this->context->getDeliveryAddress();
+
+        $order = DB::transaction(function () use ($items, $products, $total, $address) {
             $order = Order::create([
                 'user_id' => $this->user->id,
                 'total_price' => $total,
+                'phone' => $address['phone'] ?? null,
+                'secondary_phone' => $address['secondary_phone'] ?? null,
+                'address' => $address['address'] ?? null,
+                'city' => $address['city'] ?? null,
+                'state' => $address['state'] ?? null,
+                'country' => $address['country'] ?? null,
             ]);
 
             foreach ($items as $item) {
@@ -109,7 +117,15 @@ class PlaceOrderTool implements Tool
             return "{$product->name} x{$item['quantity']} (\${$product->price} each)";
         })->implode(', ');
 
-        $result = "Your order has been placed successfully: {$order->order_code}. Items: {$summary}. Total: \${$total}. Tell the user their order code ({$order->order_code}) so they can track the order later.";
+        if ($address) {
+            $this->context->setOrderInfo([
+                'order_code' => $order->order_code,
+                'status' => $order->status,
+                ...$address,
+            ]);
+        }
+
+        $result = "Your order has been placed successfully: {$order->order_code}. Items: {$summary}. Total: \${$total}. Tell the user their order code ({$order->order_code}) so they can track the order later. The delivery address is shown to the user separately — do not ask for it.";
 
         $categoryIds = $products->pluck('category_id')->filter()->unique();
 

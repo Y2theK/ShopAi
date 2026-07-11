@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useChat } from '../services/chat'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useChat, type DeliveryAddress, type OrderInfo } from '../services/chat'
 import { fetchCategories, type Category } from '../services/dashboard'
 import { renderMarkdown } from '../utils/markdown'
 
@@ -13,6 +13,47 @@ const isCartOpen = ref(false)
 const lastMessageId = computed(
   () => chat.messages.value[chat.messages.value.length - 1]?.id,
 )
+
+const addressForm = reactive<DeliveryAddress>({
+  phone: '',
+  secondary_phone: '',
+  address: '',
+  city: '',
+  state: '',
+  country: '',
+})
+
+const showAddressForm = computed(() => {
+  const last = chat.messages.value[chat.messages.value.length - 1]
+  return Boolean(last?.awaitingConfirmation) && !chat.isLoading.value
+})
+
+// Prefill with the last used address whenever a new confirmation prompt appears.
+watch(showAddressForm, (visible) => {
+  if (visible && chat.deliveryAddress.value) {
+    Object.assign(addressForm, chat.deliveryAddress.value)
+  }
+})
+
+const isAddressValid = computed(() =>
+  [addressForm.phone, addressForm.address, addressForm.city, addressForm.state, addressForm.country]
+    .every((field) => field.trim().length > 0),
+)
+
+async function handleConfirmOrder() {
+  if (!isAddressValid.value || chat.isLoading.value) return
+
+  chat.setDeliveryAddress({
+    phone: addressForm.phone.trim(),
+    secondary_phone: addressForm.secondary_phone.trim(),
+    address: addressForm.address.trim(),
+    city: addressForm.city.trim(),
+    state: addressForm.state.trim(),
+    country: addressForm.country.trim(),
+  })
+
+  await chat.confirmOrder()
+}
 
 onMounted(async () => {
   chat.initFromStorage()
@@ -65,6 +106,14 @@ async function handleCheckout() {
   await chat.checkoutOrder()
 }
 
+function orderInfoRegion(info: OrderInfo) {
+  return [info.city, info.state, info.country].filter(Boolean).join(', ')
+}
+
+function orderInfoPhones(info: OrderInfo) {
+  return [info.phone, info.secondary_phone].filter(Boolean).join(' · ')
+}
+
 async function quickCategory(categoryName: string) {
   if (chat.isLoading.value) return
   await chat.sendMessage(`Show me ${categoryName} products`)
@@ -101,17 +150,46 @@ async function quickCategory(categoryName: string) {
           <!-- eslint-disable-next-line vue/no-v-html -->
           <div class="bubble bubble--ai" v-html="renderMarkdown(msg.content)" />
 
-          <div
+          <div v-if="msg.orderInfo" class="delivery-card">
+            <p class="delivery-card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Delivery details · {{ msg.orderInfo.order_code }}
+            </p>
+            <p class="delivery-card-line">{{ msg.orderInfo.address }}</p>
+            <p v-if="orderInfoRegion(msg.orderInfo)" class="delivery-card-line delivery-card-line--muted">
+              {{ orderInfoRegion(msg.orderInfo) }}
+            </p>
+            <p v-if="orderInfoPhones(msg.orderInfo)" class="delivery-card-line delivery-card-line--muted">
+              {{ orderInfoPhones(msg.orderInfo) }}
+            </p>
+          </div>
+
+          <form
             v-if="msg.awaitingConfirmation && msg.id === lastMessageId && !chat.isLoading.value"
-            class="quick-order-row"
+            class="delivery-form"
+            @submit.prevent="handleConfirmOrder"
           >
-            <button class="confirm-order-btn" @click="chat.confirmOrder()">
+            <p class="delivery-form-title">Delivery details</p>
+            <div class="delivery-form-grid">
+              <input v-model="addressForm.phone" type="tel" placeholder="Phone *" maxlength="30" />
+              <input v-model="addressForm.secondary_phone" type="tel" placeholder="Secondary phone" maxlength="30" />
+            </div>
+            <textarea v-model="addressForm.address" placeholder="Full address *" rows="2" maxlength="500" />
+            <div class="delivery-form-grid">
+              <input v-model="addressForm.city" type="text" placeholder="City *" maxlength="100" />
+              <input v-model="addressForm.state" type="text" placeholder="State *" maxlength="100" />
+            </div>
+            <input v-model="addressForm.country" type="text" placeholder="Country *" maxlength="100" />
+            <button type="submit" class="confirm-order-btn" :disabled="!isAddressValid">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               Confirm order
             </button>
-          </div>
+          </form>
 
           <div v-else-if="msg.products?.length && !chat.isLoading.value" class="quick-order-row">
             <button
@@ -433,6 +511,96 @@ async function quickCategory(categoryName: string) {
   transform: translateY(-1px);
 }
 
+.delivery-card {
+  width: 80%;
+  padding: 10px 14px;
+  border-radius: 4px 14px 14px 14px;
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.delivery-card-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c7d2fe;
+}
+
+.delivery-card-line {
+  margin: 0 0 2px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #e2e8f0;
+}
+
+.delivery-card-line--muted {
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 0.75rem;
+}
+
+.delivery-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 90%;
+  padding: 10px 12px;
+  border-radius: 4px 14px 14px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.delivery-form-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #c7d2fe;
+}
+
+.delivery-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.delivery-form input,
+.delivery-form textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.7);
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s ease;
+}
+
+.delivery-form input::placeholder,
+.delivery-form textarea::placeholder {
+  color: rgba(148, 163, 184, 0.55);
+}
+
+.delivery-form input:focus,
+.delivery-form textarea:focus {
+  border-color: rgba(129, 140, 248, 0.6);
+}
+
+.delivery-form .confirm-order-btn {
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.confirm-order-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .confirm-order-btn {
   display: inline-flex;
   align-items: center;
@@ -449,7 +617,7 @@ async function quickCategory(categoryName: string) {
   white-space: nowrap;
 }
 
-.confirm-order-btn:hover {
+.confirm-order-btn:hover:not(:disabled) {
   background: rgba(34, 197, 94, 0.28);
   border-color: rgba(74, 222, 128, 0.65);
   transform: translateY(-1px);

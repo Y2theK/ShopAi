@@ -22,6 +22,13 @@ class ChatController extends Controller
         $payload = $request->validate([
             'message' => ['required', 'string', 'max:2000'],
             'conversation_id' => ['nullable', 'string', 'uuid'],
+            'delivery_address' => ['nullable', 'array'],
+            'delivery_address.phone' => ['required_with:delivery_address', 'string', 'max:30'],
+            'delivery_address.secondary_phone' => ['nullable', 'string', 'max:30'],
+            'delivery_address.address' => ['required_with:delivery_address', 'string', 'max:500'],
+            'delivery_address.city' => ['required_with:delivery_address', 'string', 'max:100'],
+            'delivery_address.state' => ['required_with:delivery_address', 'string', 'max:100'],
+            'delivery_address.country' => ['required_with:delivery_address', 'string', 'max:100'],
         ]);
 
         $user = $request->user();
@@ -36,6 +43,11 @@ class ChatController extends Controller
 
         try {
             $context = new AgentContext;
+
+            if (! empty($payload['delivery_address'])) {
+                $context->setDeliveryAddress($payload['delivery_address']);
+            }
+
             $agent = new ShoppingAssistantAgent($user, $context);
 
             $conversationId = $payload['conversation_id'] ?? null;
@@ -62,6 +74,7 @@ class ChatController extends Controller
                 'conversation_id' => $response->conversationId,
                 'products' => $context->getProducts(),
                 'order_placed' => $context->orderWasPlaced(),
+                'order_info' => $context->getOrderInfo(),
             ]);
         } catch (Throwable $e) {
             Log::error('Shopping assistant chat failed', [

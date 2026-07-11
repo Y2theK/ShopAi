@@ -6,11 +6,32 @@ type Product = { id: number; name: string; price: string; stock: number }
 
 type PendingItem = { id: number; name: string; price: string; quantity: number }
 
+export type DeliveryAddress = {
+  phone: string
+  secondary_phone: string
+  address: string
+  city: string
+  state: string
+  country: string
+}
+
+export type OrderInfo = {
+  order_code: string
+  status: string
+  phone: string | null
+  secondary_phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+}
+
 type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
   products?: Product[]
+  orderInfo?: OrderInfo
   awaitingConfirmation?: boolean
 }
 
@@ -18,6 +39,7 @@ type ChatState = {
   messages: ChatMessage[]
   conversationId: string | null
   pendingItems: PendingItem[]
+  deliveryAddress: DeliveryAddress | null
   isLoading: boolean
   isOpen: boolean
   error: string | null
@@ -33,6 +55,7 @@ const state = reactive<ChatState>({
   messages: [],
   conversationId: null,
   pendingItems: [],
+  deliveryAddress: null,
   isLoading: false,
   isOpen: false,
   error: null,
@@ -51,6 +74,7 @@ export function useChat() {
   const pendingTotal = computed(() =>
     state.pendingItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0),
   )
+  const deliveryAddress = computed(() => state.deliveryAddress)
   const isLoading = computed(() => state.isLoading)
   const isOpen = computed(() => state.isOpen)
   const error = computed(() => state.error)
@@ -63,8 +87,13 @@ export function useChat() {
     state.messages = []
     state.conversationId = null
     state.pendingItems = []
+    state.deliveryAddress = null
     state.error = null
     localStorage.removeItem(STORAGE_KEY)
+  }
+
+  function setDeliveryAddress(address: DeliveryAddress) {
+    state.deliveryAddress = address
   }
 
   function initFromStorage() {
@@ -143,10 +172,17 @@ export function useChat() {
     state.isLoading = true
     state.error = null
 
+    // Only attach the address while an order is awaiting confirmation, so the
+    // PII doesn't ride along on every ordinary chat message. This covers both
+    // the confirm button and a typed "yes".
+    const lastMessage = state.messages[state.messages.length - 2]
+    const attachAddress = state.deliveryAddress && lastMessage?.awaitingConfirmation
+
     try {
       const response = await api.post('/chat', {
         message: text,
         conversation_id: state.conversationId,
+        ...(attachAddress ? { delivery_address: state.deliveryAddress } : {}),
       })
 
       const data = response.data?.data ?? response.data
@@ -160,6 +196,7 @@ export function useChat() {
         content: data.reply,
         products:
           !options?.confirmationRequest && data.products?.length ? data.products : undefined,
+        orderInfo: data.order_info ?? undefined,
         awaitingConfirmation: options?.confirmationRequest || undefined,
       })
 
@@ -197,6 +234,8 @@ export function useChat() {
     pendingItems,
     pendingCount,
     pendingTotal,
+    deliveryAddress,
+    setDeliveryAddress,
     isLoading,
     isOpen,
     error,

@@ -71,7 +71,7 @@ class ShoppingAssistantAgent implements Agent, Conversational, HasTools
             new GetProductDetailsTool($this->context),
             new ListProductsTool($this->context),
             new PlaceOrderTool($this->user, $this->context),
-            new TrackOrderTool($this->user),
+            new TrackOrderTool($this->user, $this->context),
         ];
     }
 }

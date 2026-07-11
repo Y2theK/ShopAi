@@ -123,6 +123,51 @@ class PlaceOrderToolTest extends TestCase
         $this->assertNotContains('T-Shirt', $suggestedNames);
     }
 
+    public function test_the_delivery_address_from_the_context_is_stored_on_the_order(): void
+    {
+        $user = User::factory()->create();
+        $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
+
+        $context = new AgentContext;
+        $context->setDeliveryAddress([
+            'phone' => '0912345678',
+            'secondary_phone' => '0987654321',
+            'address' => '123 Main Street',
+            'city' => 'Yangon',
+            'state' => 'Yangon Region',
+            'country' => 'Myanmar',
+        ]);
+
+        $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
+            'items' => [['product_id' => $product->id, 'quantity' => 1]],
+        ]));
+
+        $this->assertStringNotContainsString('123 Main Street', $result);
+        $this->assertStringNotContainsString('0912345678', $result);
+        $this->assertSame('123 Main Street', $context->getOrderInfo()['address']);
+
+        $order = Order::first();
+        $this->assertSame('0912345678', $order->phone);
+        $this->assertSame('0987654321', $order->secondary_phone);
+        $this->assertSame('123 Main Street', $order->address);
+        $this->assertSame('Yangon', $order->city);
+        $this->assertSame('Yangon Region', $order->state);
+        $this->assertSame('Myanmar', $order->country);
+    }
+
+    public function test_an_order_without_a_delivery_address_still_succeeds(): void
+    {
+        $user = User::factory()->create();
+        $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
+
+        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
+            'items' => [['product_id' => $product->id, 'quantity' => 1]],
+        ]));
+
+        $this->assertStringContainsString('placed successfully', $result);
+        $this->assertNull(Order::first()->address);
+    }
+
     public function test_orders_above_the_total_cap_are_rejected(): void
     {
         $user = User::factory()->create();
