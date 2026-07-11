@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Ai\ChartContext;
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -12,6 +13,8 @@ use Stringable;
 
 class CustomerSummaryTool implements Tool
 {
+    use CachesToolResults;
+
     public function __construct(private ChartContext $context) {}
 
     public function description(): Stringable|string
@@ -23,6 +26,16 @@ class CustomerSummaryTool implements Tool
     {
         $months = max(1, $request->integer('months', 6));
 
+        return $this->cached(
+            "admin-tools:customer-summary:{$months}",
+            fn () => $this->compute($months),
+            300,
+            $this->context,
+        );
+    }
+
+    private function compute(int $months): string
+    {
         $totalCustomers = User::count();
 
         if ($totalCustomers === 0) {

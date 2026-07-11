@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Ai\ChartContext;
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -12,6 +13,8 @@ use Stringable;
 
 class BestSellingProductsTool implements Tool
 {
+    use CachesToolResults;
+
     public function __construct(private ChartContext $context) {}
 
     public function description(): Stringable|string
@@ -24,6 +27,16 @@ class BestSellingProductsTool implements Tool
         $limit = $request->integer('limit', 5);
         $days = $request->integer('days');
 
+        return $this->cached(
+            "admin-tools:best-selling-products:{$limit}:{$days}",
+            fn () => $this->compute($limit, $days),
+            300,
+            $this->context,
+        );
+    }
+
+    private function compute(int $limit, int $days): string
+    {
         $orderItems = (new OrderItem)->getTable();
         $products = (new Product)->getTable();
 

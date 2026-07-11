@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { computed, reactive } from 'vue'
 import api from './api'
 
@@ -85,8 +86,16 @@ export function useChat() {
       if (data.conversation_id) {
         localStorage.setItem(STORAGE_KEY, data.conversation_id)
       }
-    } catch {
-      state.error = 'Failed to send message. Please try again.'
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 429) {
+        const retryAfter = Number(err.response.headers['retry-after'])
+        state.error =
+          Number.isFinite(retryAfter) && retryAfter > 0
+            ? `You're sending messages too quickly — try again in ${retryAfter}s.`
+            : "You're sending messages too quickly — please slow down."
+      } else {
+        state.error = 'Failed to send message. Please try again.'
+      }
       state.messages = state.messages.filter((m) => m.id !== userMessage.id)
     } finally {
       state.isLoading = false

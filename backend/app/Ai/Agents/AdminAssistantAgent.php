@@ -13,6 +13,8 @@ use App\Ai\Tools\RecentOrdersTool;
 use App\Ai\Tools\SalesSummaryTool;
 use App\Ai\Tools\TopCustomersTool;
 use App\Models\User;
+use Laravel\Ai\Attributes\MaxSteps;
+use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
@@ -21,6 +23,8 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Promptable;
 use Stringable;
 
+#[MaxSteps(10)]
+#[MaxTokens(3000)]
 class AdminAssistantAgent implements Agent, Conversational, HasTools
 {
     use Promptable, RemembersConversations;

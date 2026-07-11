@@ -8,6 +8,8 @@ use App\Ai\Tools\ListProductsTool;
 use App\Ai\Tools\PlaceOrderTool;
 use App\Ai\Tools\SearchProductsTool;
 use App\Models\User;
+use Laravel\Ai\Attributes\MaxSteps;
+use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Concerns\RemembersConversations;
@@ -21,6 +23,8 @@ use Stringable;
 
 // #[Provider(Lab::OpenRouter)]
 // #[Model('google/gemma-4-31b-it:free')]
+#[MaxSteps(6)]
+#[MaxTokens(2000)]
 class ShoppingAssistantAgent implements Agent, Conversational, HasTools
 {
     use Promptable, RemembersConversations;

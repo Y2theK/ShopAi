@@ -9,6 +9,7 @@ use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ChatController extends Controller
@@ -19,7 +20,7 @@ class ChatController extends Controller
     {
         $payload = $request->validate([
             'message' => ['required', 'string', 'max:2000'],
-            'conversation_id' => ['nullable', 'string'],
+            'conversation_id' => ['nullable', 'string', 'uuid'],
         ]);
 
         $user = $request->user();
@@ -53,7 +54,12 @@ class ChatController extends Controller
                 'products' => $context->getProducts(),
             ]);
         } catch (Throwable $e) {
-            return $this->errorResponse('Failed to get a response from the assistant: '.$e->getMessage(), 500);
+            Log::error('Shopping assistant chat failed', [
+                'user_id' => $user->id,
+                'exception' => $e,
+            ]);
+
+            return $this->errorResponse('The assistant is unavailable right now. Please try again shortly.', 500);
         }
     }
 }

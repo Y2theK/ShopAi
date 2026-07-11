@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Ai\ChartContext;
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\Product;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -11,6 +12,8 @@ use Stringable;
 
 class LowStockProductsTool implements Tool
 {
+    use CachesToolResults;
+
     public function __construct(private ChartContext $context) {}
 
     public function description(): Stringable|string
@@ -22,6 +25,16 @@ class LowStockProductsTool implements Tool
     {
         $threshold = $request->integer('threshold', 5);
 
+        return $this->cached(
+            "admin-tools:low-stock-products:{$threshold}",
+            fn () => $this->compute($threshold),
+            300,
+            $this->context,
+        );
+    }
+
+    private function compute(int $threshold): string
+    {
         $products = Product::query()
             ->lowStock($threshold)
             ->get(['id', 'name', 'stock']);

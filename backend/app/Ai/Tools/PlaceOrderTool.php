@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -14,6 +15,12 @@ use Stringable;
 
 class PlaceOrderTool implements Tool
 {
+    private const MAX_QUANTITY_PER_ITEM = 20;
+
+    private const MAX_DISTINCT_ITEMS = 10;
+
+    private const MAX_ORDER_TOTAL = 10_000.0;
+
     public function __construct(private User $user) {}
 
     public function description(): Stringable|string
@@ -25,7 +32,16 @@ class PlaceOrderTool implements Tool
     {
         $items = $request->array('items');
 
+        if (count($items) > self::MAX_DISTINCT_ITEMS) {
+            return 'Orders may contain at most '.self::MAX_DISTINCT_ITEMS.' different products. Please split the order.';
+        }
+
         $productIds = array_map(fn ($i) => $i['product_id'], $items);
+
+        if (count($productIds) !== count(array_unique($productIds))) {
+            return 'Each product may only appear once per order. Combine duplicate lines into a single quantity.';
+        }
+
         $products = Product::findMany($productIds)->keyBy('id');
 
         $total = 0;
@@ -39,11 +55,19 @@ class PlaceOrderTool implements Tool
 
             $qty = (int) $item['quantity'];
 
+            if ($qty < 1 || $qty > self::MAX_QUANTITY_PER_ITEM) {
+                return "Quantity for {$product->name} must be between 1 and ".self::MAX_QUANTITY_PER_ITEM.'.';
+            }
+
             if ($product->stock < $qty) {
                 return "Insufficient stock for {$product->name}. Available: {$product->stock}.";
             }
 
             $total += (float) $product->price * $qty;
+        }
+
+        if ($total > self::MAX_ORDER_TOTAL) {
+            return 'This order exceeds the $'.number_format(self::MAX_ORDER_TOTAL).' assistant checkout limit. Please place it through the store checkout instead.';
         }
 
         $order = DB::transaction(function () use ($items, $products, $total) {
@@ -69,6 +93,8 @@ class PlaceOrderTool implements Tool
             return $order;
         });
 
+        Cache::tags(['products'])->flush();
+
         $summary = collect($items)->map(function ($item) use ($products) {
             $product = $products[$item['product_id']];
 
@@ -83,10 +109,10 @@ class PlaceOrderTool implements Tool
         return [
             'items' => $schema->array()->items(
                 $schema->object([
-                    'product_id' => $schema->integer()->required(),
-                    'quantity' => $schema->integer()->required(),
+                    'product_id' => $schema->integer()->min(1)->required(),
+                    'quantity' => $schema->integer()->min(1)->max(self::MAX_QUANTITY_PER_ITEM)->required(),
                 ])
-            )->min(1)->required(),
+            )->min(1)->max(self::MAX_DISTINCT_ITEMS)->required(),
         ];
     }
 }

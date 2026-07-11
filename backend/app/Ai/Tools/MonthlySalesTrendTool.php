@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Ai\ChartContext;
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\Order;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -11,6 +12,8 @@ use Stringable;
 
 class MonthlySalesTrendTool implements Tool
 {
+    use CachesToolResults;
+
     public function __construct(private ChartContext $context) {}
 
     public function description(): Stringable|string
@@ -22,6 +25,16 @@ class MonthlySalesTrendTool implements Tool
     {
         $months = max(1, $request->integer('months', 6));
 
+        return $this->cached(
+            "admin-tools:monthly-sales-trend:{$months}",
+            fn () => $this->compute($months),
+            300,
+            $this->context,
+        );
+    }
+
+    private function compute(int $months): string
+    {
         $rows = Order::query()
             ->where('created_at', '>=', now()->subMonths($months - 1)->startOfMonth())
             ->selectRaw("strftime('%Y-%m', created_at) as month")

@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools;
 
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -11,6 +12,8 @@ use Stringable;
 
 class SalesSummaryTool implements Tool
 {
+    use CachesToolResults;
+
     public function description(): Stringable|string
     {
         return 'Get an overall sales summary: total revenue, number of orders, and average order value. Optionally restrict to the last N days.';
@@ -20,6 +23,14 @@ class SalesSummaryTool implements Tool
     {
         $days = $request->integer('days');
 
+        return $this->cached(
+            "admin-tools:sales-summary:{$days}",
+            fn () => $this->compute($days),
+        );
+    }
+
+    private function compute(int $days): string
+    {
         $summary = Order::query()
             ->when($days > 0, fn ($q) => $q->where('created_at', '>=', now()->subDays($days)))
             ->selectRaw('COUNT(*) as orders_count')

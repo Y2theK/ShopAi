@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Ai\ChartContext;
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -11,6 +12,8 @@ use Stringable;
 
 class TopCustomersTool implements Tool
 {
+    use CachesToolResults;
+
     public function __construct(private ChartContext $context) {}
 
     public function description(): Stringable|string
@@ -22,6 +25,16 @@ class TopCustomersTool implements Tool
     {
         $limit = max(1, $request->integer('limit', 5));
 
+        return $this->cached(
+            "admin-tools:top-customers:{$limit}",
+            fn () => $this->compute($limit),
+            300,
+            $this->context,
+        );
+    }
+
+    private function compute(int $limit): string
+    {
         $customers = User::query()
             ->withSum('orders as total_spent', 'total_price')
             ->withCount('orders')

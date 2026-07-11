@@ -2,6 +2,7 @@
 
 namespace App\Ai\Tools;
 
+use App\Ai\Concerns\CachesToolResults;
 use App\Models\Product;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -10,12 +11,22 @@ use Stringable;
 
 class InventorySummaryTool implements Tool
 {
+    use CachesToolResults;
+
     public function description(): Stringable|string
     {
         return 'Get an inventory overview: total number of products, total units in stock, total inventory value, and how many products are out of stock.';
     }
 
     public function handle(Request $request): Stringable|string
+    {
+        return $this->cached(
+            'admin-tools:inventory-summary',
+            fn () => $this->compute(),
+        );
+    }
+
+    private function compute(): string
     {
         $summary = Product::query()
             ->selectRaw('COUNT(*) as products_count')

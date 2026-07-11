@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
@@ -25,12 +26,12 @@ class OrderController extends Controller
         ]);
 
         $items = $payload['items'];
-        $productIds = array_map(fn($i) => $i['product_id'], $items);
+        $productIds = array_map(fn ($i) => $i['product_id'], $items);
 
         $products = Product::findMany($productIds)->keyBy('id');
-        
+
         $total = 0;
-    
+
         foreach ($items as $item) {
             $product = $products[$item['product_id']];
             $qty = (int) $item['quantity'];
@@ -64,6 +65,8 @@ class OrderController extends Controller
 
             return $order;
         });
+
+        Cache::tags(['products'])->flush();
 
         if (! $order) {
             return $this->errorResponse('Failed to create order!', 500);
