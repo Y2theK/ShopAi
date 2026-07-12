@@ -38,6 +38,8 @@ Two laravel/ai agents live in `app/Ai/Agents/`: `ShoppingAssistantAgent` (`POST 
 
 PII protection (`pii-masking.md` has the full design): chat controllers mask structured PII (`app/Ai/PiiMasker` — email, Myanmar NRC, MM phone, SSN, passport, long digit runs) in the user message **before** `prompt()`, so provider payloads, stored transcripts, and history replays are all sanitized — inbound masking must stay in the controllers because `RememberConversation` runs outside agent middleware and stores the raw prompt. `PiiLeakCanary` middleware on both agents is advisory-only: it re-masks inbound as defense-in-depth and logs pattern names (never values) if a reply contains raw PII. Tool results must never interpolate street addresses or unmasked phones (`MasksPii` trait, `AgentContext` side channel); customer emails in admin tools are masked via `maskEmail()`.
 
+Prompt injection defense (`prompt-injection-hardening.md` has the full design) is containment-first: detection (`PromptInjectionDetector`) is advisory-only and never blocks a single message. `TextNormalizer` (NFKC + zero-width stripping) runs inside the detector and `PiiMasker` to defeat unicode evasion. The controllers add a behavioral throttle (3 flagged messages / 10 min → 429 via `RateLimiter`), `PromptInjectionCanary` middleware covers non-controller call sites, and `FlagsSuspiciousToolData` flags injection markers in tool results that embed customer-controlled text (indirect injection).
+
 ### Frontend
 
 `src/services/auth.ts` — module-level reactive singleton managing auth state. The `useAuth()` composable is used everywhere; do not create additional auth state. The `bootstrap()` method is idempotent (deduplicated with a promise) and is called in the router guard on every navigation.

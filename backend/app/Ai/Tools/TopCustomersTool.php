@@ -5,6 +5,7 @@ namespace App\Ai\Tools;
 use App\Ai\ChartContext;
 use App\Ai\Concerns\CachesToolResults;
 use App\Models\User;
+use App\Traits\FlagsSuspiciousToolData;
 use App\Traits\MasksPii;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -13,7 +14,7 @@ use Stringable;
 
 class TopCustomersTool implements Tool
 {
-    use CachesToolResults, MasksPii;
+    use CachesToolResults, FlagsSuspiciousToolData, MasksPii;
 
     public function __construct(private ChartContext $context) {}
 
@@ -26,12 +27,12 @@ class TopCustomersTool implements Tool
     {
         $limit = max(1, $request->integer('limit', 5));
 
-        return $this->cached(
+        return $this->flagSuspiciousToolData((string) $this->cached(
             "admin-tools:top-customers:{$limit}",
             fn () => $this->compute($limit),
             300,
             $this->context,
-        );
+        ));
     }
 
     private function compute(int $limit): string

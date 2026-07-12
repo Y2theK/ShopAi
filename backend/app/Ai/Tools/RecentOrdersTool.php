@@ -3,6 +3,7 @@
 namespace App\Ai\Tools;
 
 use App\Models\Order;
+use App\Traits\FlagsSuspiciousToolData;
 use App\Traits\MasksPii;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -11,7 +12,7 @@ use Stringable;
 
 class RecentOrdersTool implements Tool
 {
-    use MasksPii;
+    use FlagsSuspiciousToolData, MasksPii;
 
     public function description(): Stringable|string
     {
@@ -50,7 +51,7 @@ class RecentOrdersTool implements Tool
             $lines[] = "Order #{$order->id} — {$customerName}: \${$total}, {$order->items_count} item(s), placed {$date}";
         }
 
-        return implode("\n", $lines);
+        return $this->flagSuspiciousToolData(implode("\n", $lines));
     }
 
     public function schema(JsonSchema $schema): array

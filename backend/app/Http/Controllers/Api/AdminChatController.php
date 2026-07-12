@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
 class AdminChatController extends Controller
@@ -33,6 +34,14 @@ class AdminChatController extends Controller
                 'pattern' => $pattern,
                 'endpoint' => 'admin-chat',
             ]);
+
+            // Behavioral throttle: a single match is never blocked, but three
+            // flagged messages within ten minutes stop reaching the agent.
+            RateLimiter::hit($throttleKey = "chat-injection:{$user->id}", 600);
+
+            if (RateLimiter::attempts($throttleKey) >= 3) {
+                return $this->errorResponse('Too many suspicious messages. Please try again later.', 429);
+            }
         }
 
         // Masked before the agent sees it, so the provider payload, the stored

@@ -30,6 +30,8 @@ class PromptInjectionDetector
      */
     public function detect(string $message): ?string
     {
+        $message = TextNormalizer::normalize($message);
+
         foreach (self::PATTERNS as $name => $pattern) {
             if (preg_match($pattern, $message) === 1) {
                 return $name;

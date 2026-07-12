@@ -80,6 +80,7 @@ class PiiMaskingTest extends TestCase
             ['mm_phone', 'call 09123456789 after lunch'],
             ['mm_phone', 'call 09-123-456-789 after lunch'],
             ['mm_phone', 'call +959123456789 after lunch'],
+            ['mm_phone', 'call ０９１２３４５６７８９ after lunch'],
             ['passport', 'passport MD123456'],
             ['digit_run', 'card 4242 4242 4242 4242'],
             ['digit_run', 'account 12345678901234'],

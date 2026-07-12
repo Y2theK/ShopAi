@@ -30,6 +30,8 @@ class PiiMasker
      */
     public function mask(string $text): string
     {
+        $text = TextNormalizer::normalize($text);
+
         foreach (self::PATTERNS as $name => $pattern) {
             $text = (string) preg_replace($pattern, "[{$name}-redacted]", $text);
         }
@@ -45,6 +47,8 @@ class PiiMasker
      */
     public function detect(string $text): array
     {
+        $text = TextNormalizer::normalize($text);
+
         $matches = [];
 
         foreach (self::PATTERNS as $name => $pattern) {
