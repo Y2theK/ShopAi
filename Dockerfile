@@ -47,14 +47,21 @@ FROM base
 
 WORKDIR /var/www
 
-COPY --from=vendor /var/www /var/www
+# Hugging Face Spaces run the container as UID 1000 without root. Owning the
+# app and the nginx runtime dirs by a uid-1000 user keeps that host working;
+# root hosts (Render, compose) re-chown storage to www-data in the entrypoint.
+RUN adduser -D -u 1000 app
+
+COPY --from=vendor --chown=app:app /var/www /var/www
 COPY backend/docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY backend/docker/entrypoint.sh /usr/local/bin/app-entrypoint
 COPY backend/docker/app-web.sh /usr/local/bin/app-web
 RUN chmod +x /usr/local/bin/app-entrypoint /usr/local/bin/app-web \
-    && apk add --no-cache nginx
+    && apk add --no-cache nginx redis \
+    && mkdir -p /run/nginx \
+    && chown -R app:app /run/nginx /var/lib/nginx /var/log/nginx
 
-COPY --from=spa /app/dist /var/www/spa
+COPY --from=spa --chown=app:app /app/dist /var/www/spa
 COPY backend/docker/nginx-fullstack.conf /etc/nginx/http.d/default.conf
 
 EXPOSE 8080
