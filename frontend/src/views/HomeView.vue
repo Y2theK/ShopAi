@@ -142,7 +142,7 @@ function formatCurrency(value: number) {
     <section class="dashboard-panel">
       <header class="hero">
         <div>
-          <p class="eyebrow">Ecom Store</p>
+          <p class="eyebrow">ShopAi Store</p>
           <p class="subtitle">
            Select products, review totals, and submit the order in one view.
           </p>

@@ -99,7 +99,7 @@ APP_KEY=              # required
 OPENROUTER_API_KEY=   # required for chat agents (primary provider)
 OPENAI_API_KEY=       # required for chat agents (failover provider)
 ANTHROPIC_API_KEY=    # optional
-DB_PASSWORD=          # optional, defaults to ecom-local-pw
+DB_PASSWORD=          # optional, defaults to ShopAi-local-pw
 AI_CHAT_*             # optional provider/model overrides, see .env.example
 ```
 

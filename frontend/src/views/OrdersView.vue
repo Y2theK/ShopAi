@@ -79,7 +79,7 @@ function formatDate(value: string | null) {
     <section class="dashboard-panel">
       <header class="hero">
         <div>
-          <p class="eyebrow">Ecom Store</p>
+          <p class="eyebrow">ShopAi Store</p>
           <p class="subtitle">Review your past orders and track their status.</p>
         </div>
 

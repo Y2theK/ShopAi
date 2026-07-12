@@ -26,7 +26,7 @@ Already handled during setup:
 ## Run instructions
 
 ```bash
-cd ~/Desktop/tutorials/ecom
+cd ~/Desktop/tutorials/ShopAi
 
 # 1. Build images + start all 3 containers (first build takes a few minutes)
 docker compose up --build -d
@@ -72,7 +72,7 @@ Two failure modes worth knowing:
   app caches products/categories/AI-tool results with cache *tags*, which the
   `database` cache store doesn't support (Redis does), and data now lives in a
   `mysql` container (`mysql-data` volume). `DB_PASSWORD` in the root `.env` is
-  optional; it defaults to `ecom-local-pw` for local use.
+  optional; it defaults to `ShopAi-local-pw` for local use.
 - **`route:cache` is skipped** — `routes/web.php` has a closure route, which
   can't be serialized. `config:cache` still runs.
 - **nginx.conf lives in `frontend/docker/`** instead of a root `docker/`

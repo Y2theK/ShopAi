@@ -1,4 +1,4 @@
-# Ecom Store
+# ShopAi Store
 
 #### Objective:
 A Multi-User Order & Inventory System (Mini SaaS Style).
@@ -25,17 +25,17 @@ orders.
 `Laravel 11` `sqlite` `vue 3`  `tailwindcss`  `axios` 
 
 ### Screenshots
-<img src="https://github.com/Y2theK/ecom/blob/master/frontend/src/assets/image/home.png" width=50% height=50% alt= "Home">
-<img src="https://github.com/Y2theK/ecom/blob/master/frontend/src/assets/image/login.png" width=50% height=50% alt= "Login">
+<img src="https://github.com/Y2theK/ShopAi/blob/master/frontend/src/assets/image/home.png" width=50% height=50% alt= "Home">
+<img src="https://github.com/Y2theK/ShopAi/blob/master/frontend/src/assets/image/login.png" width=50% height=50% alt= "Login">
 
 ### Installation
 
 ```shell
-git clone https://github.com/Y2theK/ecom.git
+git clone https://github.com/Y2theK/ShopAi.git
 ```
 
 ```shell
-cd ecom
+cd ShopAi
 ```
 
 - For Backend Setup

@@ -1,10 +1,10 @@
-name: ecom
+name: ShopAi
 
 # Shared definition for both Laravel containers (app + queue worker).
 x-backend: &backend
   build: ./backend
   environment:
-    APP_NAME: Ecom
+    APP_NAME: ShopAi
     APP_ENV: local
     APP_DEBUG: "false"
     APP_KEY: "${APP_KEY:?APP_KEY is missing — copy .env.example to .env and set it (see .env.example)}"
@@ -14,9 +14,9 @@ x-backend: &backend
     DB_CONNECTION: pgsql
     DB_HOST: postgres
     DB_PORT: "5432"
-    DB_DATABASE: ecom
-    DB_USERNAME: ecom
-    DB_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
+    DB_DATABASE: ShopAi
+    DB_USERNAME: ShopAi
+    DB_PASSWORD: ${DB_PASSWORD:-ShopAi-local-pw}
     SESSION_DRIVER: database
     # Redis is required for the cache: product/category/AI-tool caching uses
     # cache tags, which the database store does not support.
@@ -43,15 +43,15 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ecom
-      POSTGRES_USER: ecom
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
+      POSTGRES_DB: ShopAi
+      POSTGRES_USER: ShopAi
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ShopAi-local-pw}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       # -h 127.0.0.1 forces TCP: during first-boot init Postgres runs a
       # socket-only temp server that would otherwise report healthy too early.
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "ecom", "-d", "ecom"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "ShopAi", "-d", "ShopAi"]
       interval: 5s
       timeout: 3s
       retries: 30
