@@ -18,16 +18,22 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
         ]);
 
-        // User::factory(10)->create();
-
-        User::factory()->create([
+        // No factories here: seeders also run in the production Docker image,
+        // where Faker (a require-dev dependency) is not installed.
+        User::forceCreate([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'email_verified_at' => now(),
+            'password' => 'password',
+            'is_admin' => false,
         ]);
 
-        User::factory()->admin()->create([
+        User::forceCreate([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
+            'email_verified_at' => now(),
+            'password' => 'password',
+            'is_admin' => true,
         ]);
     }
 }

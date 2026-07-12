@@ -10,14 +10,23 @@ mkdir -p storage/app/public \
     storage/framework/sessions \
     storage/framework/views \
     storage/logs \
-    bootstrap/cache \
-    /data
+    bootstrap/cache
 
-chown -R www-data:www-data storage bootstrap/cache /data
+chown -R www-data:www-data storage bootstrap/cache
 
 if [ "$1" = "php-fpm" ]; then
-    [ -f /data/database.sqlite ] || su-exec www-data touch /data/database.sqlite
-    su-exec www-data php artisan migrate --force
+    # Compose only starts this container once MySQL reports healthy, but the
+    # server can still refuse connections for a moment — retry instead of dying.
+    tries=0
+    until su-exec www-data php artisan migrate --force; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 10 ]; then
+            echo "Database never became reachable; giving up." >&2
+            exit 1
+        fi
+        echo "Waiting for the database... (attempt $tries)"
+        sleep 3
+    done
     su-exec www-data php artisan config:cache
     # route:cache is skipped: routes/web.php contains a closure route, which
     # cannot be serialized into the route cache.
@@ -28,7 +37,7 @@ fi
 
 # Any other command (queue worker, one-off artisan): wait until the app
 # container has finished running migrations, then run as www-data.
-until [ -f /data/database.sqlite ] && su-exec www-data php artisan migrate:status >/dev/null 2>&1; do
+until su-exec www-data php artisan migrate:status >/dev/null 2>&1; do
     echo "Waiting for the app container to finish database setup..."
     sleep 2
 done

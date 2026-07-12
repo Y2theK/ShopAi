@@ -5,28 +5,68 @@ x-backend: &backend
   build: ./backend
   environment:
     APP_NAME: Ecom
-    APP_ENV: production
+    APP_ENV: local
     APP_DEBUG: "false"
     APP_KEY: "${APP_KEY:?APP_KEY is missing — copy .env.example to .env and set it (see .env.example)}"
     APP_URL: http://localhost:8080
     FRONTEND_URL: http://localhost:8080
     SANCTUM_STATEFUL_DOMAINS: localhost:8080
-    DB_CONNECTION: sqlite
-    DB_DATABASE: /data/database.sqlite
+    DB_CONNECTION: mysql
+    DB_HOST: mysql
+    DB_PORT: "3306"
+    DB_DATABASE: ecom
+    DB_USERNAME: ecom
+    DB_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
     SESSION_DRIVER: database
-    CACHE_STORE: database
+    # Redis is required for the cache: product/category/AI-tool caching uses
+    # cache tags, which the database store does not support.
+    CACHE_STORE: redis
+    REDIS_CLIENT: predis
+    REDIS_HOST: redis
     QUEUE_CONNECTION: database
     LOG_CHANNEL: stderr
     LOG_LEVEL: info
     OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   volumes:
-    - sqlite-data:/data
     - storage-data:/var/www/storage/app
 
 services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ecom
+      MYSQL_USER: ecom
+      MYSQL_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
+      MYSQL_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # -h 127.0.0.1 forces TCP: during first-boot init MySQL runs a
+      # socket-only temp server that would otherwise report healthy too early.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
   app:
     <<: *backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       # The entrypoint touches this file after migrations and caching finish.
       test: ["CMD", "test", "-f", "/tmp/app-ready"]
@@ -41,6 +81,8 @@ services:
     restart: unless-stopped
     depends_on:
       app:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   web:
@@ -58,5 +100,5 @@ services:
       start_period: 5s
 
 volumes:
-  sqlite-data:
+  mysql-data:
   storage-data:

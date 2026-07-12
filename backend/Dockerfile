@@ -2,7 +2,7 @@ FROM php:8.4-fpm-alpine AS base
 
 RUN apk add --no-cache su-exec \
     && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
-    && docker-php-ext-install opcache pcntl bcmath \
+    && docker-php-ext-install opcache pcntl bcmath pdo_mysql \
     && apk del .build-deps
 
 # ---- composer dependencies (built on the same PHP as production) ----
