@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuth } from '../services/auth'
-import { fetchCategories, fetchProducts, getErrorMessage, placeOrder, type Category, type Product } from '../services/dashboard'
+import { fetchCategories, fetchProducts, getErrorMessage, placeOrder, type Category, type DeliveryAddress, type Product } from '../services/dashboard'
 
 const auth = useAuth()
 const user = auth.user
@@ -39,10 +39,25 @@ const selectedTotal = computed(() =>
   selectedItems.value.reduce((total, product) => total + product.price * product.quantity, 0),
 )
 
+const deliveryForm = reactive<DeliveryAddress>({
+  phone: '',
+  secondary_phone: '',
+  address: '',
+  city: '',
+  state: '',
+  country: '',
+})
+
+const isDeliveryValid = computed(() =>
+  [deliveryForm.phone, deliveryForm.address, deliveryForm.city, deliveryForm.state, deliveryForm.country]
+    .every((field) => field.trim().length > 0),
+)
+
 const canPlaceOrder = computed(() =>
   !loadingProducts.value
   && !placingOrder.value
-  && selectedItems.value.length > 0,
+  && selectedItems.value.length > 0
+  && isDeliveryValid.value,
 )
 
 onMounted(async () => {
@@ -111,6 +126,14 @@ async function handlePlaceOrder() {
         product_id: product.id,
         quantity: product.quantity,
       })),
+      {
+        phone: deliveryForm.phone.trim(),
+        secondary_phone: deliveryForm.secondary_phone.trim(),
+        address: deliveryForm.address.trim(),
+        city: deliveryForm.city.trim(),
+        state: deliveryForm.state.trim(),
+        country: deliveryForm.country.trim(),
+      },
     )
 
     successMessage.value = response.message || 'Order created successfully.'
@@ -267,9 +290,25 @@ function formatCurrency(value: number) {
               </div>
             </dl>
 
-            <button type="button" class="primary-button" :disabled="!canPlaceOrder" @click="handlePlaceOrder">
-              {{ placingOrder ? 'Placing order...' : 'Place Order' }}
-            </button>
+            <form v-if="selectedItems.length > 0" class="delivery-form" @submit.prevent="handlePlaceOrder">
+              <p class="delivery-form-title">Delivery details</p>
+              <div class="delivery-form-grid">
+                <input v-model="deliveryForm.phone" type="tel" placeholder="Phone *" maxlength="30" :disabled="placingOrder" />
+                <input v-model="deliveryForm.secondary_phone" type="tel" placeholder="Secondary phone" maxlength="30" :disabled="placingOrder" />
+              </div>
+              <textarea v-model="deliveryForm.address" placeholder="Full address *" rows="2" maxlength="500" :disabled="placingOrder" />
+              <div class="delivery-form-grid">
+                <input v-model="deliveryForm.city" type="text" placeholder="City *" maxlength="100" :disabled="placingOrder" />
+                <input v-model="deliveryForm.state" type="text" placeholder="State *" maxlength="100" :disabled="placingOrder" />
+              </div>
+              <input v-model="deliveryForm.country" type="text" placeholder="Country *" maxlength="100" :disabled="placingOrder" />
+
+              <p v-if="!isDeliveryValid" class="delivery-hint">Fill in the delivery details to place your order.</p>
+
+              <button type="submit" class="primary-button" :disabled="!canPlaceOrder">
+                {{ placingOrder ? 'Placing order...' : 'Place Order' }}
+              </button>
+            </form>
           </aside>
         </section>
       </template>
@@ -542,6 +581,62 @@ h1 {
 .totals dd {
   font-weight: 700;
   color: #f8fafc;
+}
+
+.delivery-form {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-form-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #818cf8;
+}
+
+.delivery-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.delivery-form input,
+.delivery-form textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  font-size: 0.92rem;
+  font-family: inherit;
+  resize: none;
+}
+
+.delivery-form input::placeholder,
+.delivery-form textarea::placeholder {
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.delivery-form input:focus,
+.delivery-form textarea:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #818cf8;
+}
+
+.delivery-form input:disabled,
+.delivery-form textarea:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.delivery-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.65);
 }
 
 .notice {

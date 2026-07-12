@@ -39,6 +39,13 @@ class OrderController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'delivery_address' => ['required', 'array'],
+            'delivery_address.phone' => ['required', 'string', 'max:30'],
+            'delivery_address.secondary_phone' => ['nullable', 'string', 'max:30'],
+            'delivery_address.address' => ['required', 'string', 'max:500'],
+            'delivery_address.city' => ['required', 'string', 'max:100'],
+            'delivery_address.state' => ['required', 'string', 'max:100'],
+            'delivery_address.country' => ['required', 'string', 'max:100'],
         ]);
 
         $items = $payload['items'];
@@ -59,10 +66,18 @@ class OrderController extends Controller
             $total += (float) $product->price * $qty;
         }
 
-        $order = DB::transaction(function () use ($request, $items, $products, $total) {
+        $address = $payload['delivery_address'];
+
+        $order = DB::transaction(function () use ($request, $items, $products, $total, $address) {
             $order = Order::create([
                 'user_id' => $request->user()->id,
                 'total_price' => $total,
+                'phone' => $address['phone'],
+                'secondary_phone' => $address['secondary_phone'] ?? null,
+                'address' => $address['address'],
+                'city' => $address['city'],
+                'state' => $address['state'],
+                'country' => $address['country'],
             ]);
 
             foreach ($items as $item) {

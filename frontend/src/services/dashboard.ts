@@ -15,6 +15,15 @@ export type Product = {
   category: Category | null
 }
 
+export type DeliveryAddress = {
+  phone: string
+  secondary_phone: string
+  address: string
+  city: string
+  state: string
+  country: string
+}
+
 export type OrderItem = {
   product_id: number
   quantity: number
@@ -72,8 +81,14 @@ export async function fetchOrders() {
   return response.data.data?.data ?? []
 }
 
-export async function placeOrder(items: Array<{ product_id: number, quantity: number }>) {
-  const response = await api.post<ApiEnvelope<Order>>('/orders', { items })
+export async function placeOrder(
+  items: Array<{ product_id: number, quantity: number }>,
+  deliveryAddress: DeliveryAddress,
+) {
+  const response = await api.post<ApiEnvelope<Order>>('/orders', {
+    items,
+    delivery_address: deliveryAddress,
+  })
   return response.data
 }
 

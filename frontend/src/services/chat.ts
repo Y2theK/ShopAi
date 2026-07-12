@@ -2,19 +2,13 @@ import { isAxiosError } from 'axios'
 import { computed, reactive } from 'vue'
 import { formatDuration } from '../utils/duration'
 import api from './api'
+import type { DeliveryAddress } from './dashboard'
 
 type Product = { id: number; name: string; price: string; stock: number }
 
 type PendingItem = { id: number; name: string; price: string; quantity: number }
 
-export type DeliveryAddress = {
-  phone: string
-  secondary_phone: string
-  address: string
-  city: string
-  state: string
-  country: string
-}
+export type { DeliveryAddress }
 
 export type OrderInfo = {
   order_code: string

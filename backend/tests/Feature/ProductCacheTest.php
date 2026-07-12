@@ -40,6 +40,13 @@ class ProductCacheTest extends TestCase
 
         $this->actingAs($user)->postJson('/api/v1/orders', [
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
+            'delivery_address' => [
+                'phone' => '0912345678',
+                'address' => '123 Main Street',
+                'city' => 'Yangon',
+                'state' => 'Yangon Region',
+                'country' => 'Myanmar',
+            ],
         ])->assertCreated();
 
         // The order flushed the tag, so the fresh stock level is served.
