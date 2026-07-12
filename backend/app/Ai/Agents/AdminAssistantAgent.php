@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Ai\ChartContext;
+use App\Ai\Concerns\ChatsViaConfiguredProviders;
 use App\Ai\Middleware\PiiLeakCanary;
 use App\Ai\Middleware\PromptInjectionCanary;
 use App\Ai\PiiMasker;
@@ -32,7 +33,7 @@ use Stringable;
 #[MaxTokens(3000)]
 class AdminAssistantAgent implements Agent, Conversational, HasMiddleware, HasTools
 {
-    use Promptable, RemembersConversations;
+    use ChatsViaConfiguredProviders, Promptable, RemembersConversations;
 
     public function __construct(
         private User $user,

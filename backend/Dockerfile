@@ -1,8 +1,8 @@
 FROM php:8.4-fpm-alpine AS base
 
-RUN apk add --no-cache su-exec \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
-    && docker-php-ext-install opcache pcntl bcmath pdo_mysql \
+RUN apk add --no-cache su-exec libpq \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS postgresql-dev \
+    && docker-php-ext-install opcache pcntl bcmath pdo_pgsql \
     && apk del .build-deps
 
 # ---- composer dependencies (built on the same PHP as production) ----
@@ -27,7 +27,13 @@ WORKDIR /var/www
 COPY --from=vendor /var/www /var/www
 COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY docker/entrypoint.sh /usr/local/bin/app-entrypoint
-RUN chmod +x /usr/local/bin/app-entrypoint
+COPY docker/app-web.sh /usr/local/bin/app-web
+RUN chmod +x /usr/local/bin/app-entrypoint /usr/local/bin/app-web
+
+# nginx makes the image self-serving over HTTP for single-container hosts
+# (e.g. Render); compose ignores it and keeps talking FastCGI to php-fpm.
+RUN apk add --no-cache nginx
+COPY docker/nginx-web.conf /etc/nginx/http.d/default.conf
 
 EXPOSE 9000
 

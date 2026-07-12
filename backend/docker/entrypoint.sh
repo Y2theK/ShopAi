@@ -14,8 +14,10 @@ mkdir -p storage/app/public \
 
 chown -R www-data:www-data storage bootstrap/cache
 
-if [ "$1" = "php-fpm" ]; then
-    # Compose only starts this container once MySQL reports healthy, but the
+# php-fpm = compose mode (nginx lives in the web container);
+# app-web = standalone HTTP mode (nginx + php-fpm in this container).
+if [ "$1" = "php-fpm" ] || [ "$1" = "app-web" ]; then
+    # Compose only starts this container once the DB reports healthy, but the
     # server can still refuse connections for a moment — retry instead of dying.
     tries=0
     until su-exec www-data php artisan migrate --force; do
@@ -27,6 +29,11 @@ if [ "$1" = "php-fpm" ]; then
         echo "Waiting for the database... (attempt $tries)"
         sleep 3
     done
+    # One-time seeding on hosts without shell access (e.g. Render free tier):
+    # set SEED_ON_BOOT=true for the first deploy, then remove it.
+    if [ "$SEED_ON_BOOT" = "true" ]; then
+        su-exec www-data php artisan db:seed --force
+    fi
     su-exec www-data php artisan config:cache
     # route:cache is skipped: routes/web.php contains a closure route, which
     # cannot be serialized into the route cache.

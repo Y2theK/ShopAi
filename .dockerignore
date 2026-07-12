@@ -1,0 +1,40 @@
+# Applies to the root Dockerfile (all-in-one image). The per-app
+# .dockerignore files in backend/ and frontend/ do NOT apply when the
+# build context is the repo root, so their rules are mirrored here.
+.git
+docs/
+.claude/
+*.md
+
+# backend (mirrors backend/.dockerignore)
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/.env.backup
+backend/.env.production
+backend/storage/logs/*
+backend/storage/pail
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+# Host-generated caches may reference dev-only packages that are not
+# installed in the image.
+backend/bootstrap/cache/*.php
+backend/database/*.sqlite
+backend/database/*.sqlite-journal
+backend/.phpunit.cache
+backend/.phpunit.result.cache
+backend/tests/
+backend/docs/
+backend/.claude/
+backend/boost.json
+backend/opencode.json
+backend/Dockerfile
+
+# frontend (mirrors frontend/.dockerignore)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/Dockerfile

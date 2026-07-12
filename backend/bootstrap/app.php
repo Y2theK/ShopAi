@@ -18,6 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->prepend(HandleCors::class);
         $middleware->statefulApi();
+        // Deployed behind reverse proxies (Render/Vercel), which terminate
+        // TLS; without this Laravel would see every request as plain HTTP.
+        $middleware->trustProxies(at: '*');
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
         ]);

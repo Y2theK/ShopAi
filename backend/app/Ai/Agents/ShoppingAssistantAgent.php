@@ -3,6 +3,7 @@
 namespace App\Ai\Agents;
 
 use App\Ai\AgentContext;
+use App\Ai\Concerns\ChatsViaConfiguredProviders;
 use App\Ai\Middleware\PiiLeakCanary;
 use App\Ai\Middleware\PromptInjectionCanary;
 use App\Ai\PiiMasker;
@@ -15,25 +16,20 @@ use App\Ai\Tools\TrackOrderTool;
 use App\Models\User;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\MaxTokens;
-use Laravel\Ai\Attributes\Model;
-use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasMiddleware;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
-use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 use Stringable;
 
-// #[Provider(Lab::OpenRouter)]
-// #[Model('google/gemma-4-31b-it:free')]
 #[MaxSteps(6)]
 #[MaxTokens(2000)]
 class ShoppingAssistantAgent implements Agent, Conversational, HasMiddleware, HasTools
 {
-    use Promptable, RemembersConversations;
+    use ChatsViaConfiguredProviders, Promptable, RemembersConversations;
 
     public function __construct(
         private User $user,

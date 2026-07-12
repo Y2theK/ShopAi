@@ -11,9 +11,9 @@ x-backend: &backend
     APP_URL: http://localhost:8080
     FRONTEND_URL: http://localhost:8080
     SANCTUM_STATEFUL_DOMAINS: localhost:8080
-    DB_CONNECTION: mysql
-    DB_HOST: mysql
-    DB_PORT: "3306"
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: "5432"
     DB_DATABASE: ecom
     DB_USERNAME: ecom
     DB_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
@@ -26,26 +26,32 @@ x-backend: &backend
     QUEUE_CONNECTION: database
     LOG_CHANNEL: stderr
     LOG_LEVEL: info
+    # Chat agents: OpenRouter is primary, OpenAI is the failover
+    # (config/ai.php "chat" block — all overridable from .env).
+    OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    AI_CHAT_PROVIDER: ${AI_CHAT_PROVIDER:-openrouter}
+    AI_CHAT_MODEL: ${AI_CHAT_MODEL:-google/gemma-4-31b-it:free}
+    AI_CHAT_FALLBACK_PROVIDER: ${AI_CHAT_FALLBACK_PROVIDER:-openai}
+    AI_CHAT_FALLBACK_MODEL: ${AI_CHAT_FALLBACK_MODEL:-}
   volumes:
     - storage-data:/var/www/storage/app
 
 services:
-  mysql:
-    image: mysql:8.4
+  postgres:
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ecom
-      MYSQL_USER: ecom
-      MYSQL_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
-      MYSQL_RANDOM_ROOT_PASSWORD: "1"
+      POSTGRES_DB: ecom
+      POSTGRES_USER: ecom
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecom-local-pw}
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      # -h 127.0.0.1 forces TCP: during first-boot init MySQL runs a
+      # -h 127.0.0.1 forces TCP: during first-boot init Postgres runs a
       # socket-only temp server that would otherwise report healthy too early.
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "ecom", "-d", "ecom"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -63,7 +69,7 @@ services:
   app:
     <<: *backend
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -93,12 +99,14 @@ services:
       app:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/up"]
+      # 127.0.0.1, not localhost: busybox wget prefers ::1 and nginx only
+      # listens on IPv4.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/up"]
       interval: 10s
       timeout: 3s
       retries: 5
       start_period: 5s
 
 volumes:
-  mysql-data:
+  postgres-data:
   storage-data:

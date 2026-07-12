@@ -13,12 +13,31 @@ return [
     |
     */
 
-    'default' => 'openai',
+    'default' => 'openrouter',
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
     'default_for_embeddings' => 'openai',
     'default_for_reranking' => 'cohere',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Chat Agent Providers (with failover)
+    |--------------------------------------------------------------------------
+    |
+    | Providers used by the chat agents, tried in order. When a provider
+    | fails with a failoverable error (rate limited, out of credits, or
+    | overloaded), the next one is tried. A null model means the provider's
+    | default text model. All values are configurable from the environment.
+    |
+    */
+
+    'chat' => [
+        'providers' => [
+            env('AI_CHAT_PROVIDER', 'openrouter') => env('AI_CHAT_MODEL', 'google/gemma-4-31b-it:free') ?: null,
+            env('AI_CHAT_FALLBACK_PROVIDER', 'openai') => env('AI_CHAT_FALLBACK_MODEL') ?: null,
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
