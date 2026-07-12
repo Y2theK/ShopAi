@@ -9,6 +9,7 @@ const messageList = ref<HTMLElement | null>(null)
 const inputText = ref('')
 const categories = ref<Category[]>([])
 const isCartOpen = ref(false)
+const isExpanded = ref(false)
 
 const lastMessageId = computed(
   () => chat.messages.value[chat.messages.value.length - 1]?.id,
@@ -67,9 +68,10 @@ onMounted(async () => {
 
 async function scrollToBottom() {
   await nextTick()
-  if (messageList.value) {
-    messageList.value.scrollTop = messageList.value.scrollHeight
-  }
+  messageList.value?.scrollTo({
+    top: messageList.value.scrollHeight,
+    behavior: 'smooth',
+  })
 }
 
 watch(() => chat.messages.value.length, scrollToBottom)
@@ -121,18 +123,32 @@ async function quickCategory(categoryName: string) {
 </script>
 
 <template>
-  <div v-show="chat.isOpen.value" class="chat-popup">
+  <div v-show="chat.isOpen.value" class="chat-popup" :class="{ 'chat-popup--expanded': isExpanded }">
     <!-- Header -->
     <header class="chat-header">
       <div class="chat-header-info">
         <span class="chat-status-dot" />
         <span class="chat-header-title">Shopping Assistant</span>
       </div>
-      <button class="chat-close-btn" aria-label="Close chat" @click="chat.toggleChat()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <div class="chat-header-actions">
+        <button
+          class="chat-header-btn"
+          :aria-label="isExpanded ? 'Exit full screen' : 'Full screen'"
+          @click="isExpanded = !isExpanded"
+        >
+          <svg v-if="!isExpanded" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V5m0 4H5m4 0L4 4m11 5h4m-4 0V5m0 4l5-5M9 15v4m0-4H5m4 0l-5 5m11-5l5 5m-5-5v4m0-4h4" />
+          </svg>
+        </button>
+        <button class="chat-header-btn" aria-label="Close chat" @click="chat.toggleChat()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Messages -->
@@ -300,14 +316,35 @@ async function quickCategory(categoryName: string) {
   flex-direction: column;
   border-radius: 24px;
   border: 1px solid rgba(129, 140, 248, 0.2);
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(20px);
+  /* Near-opaque instead of translucent + backdrop-filter: blurring the
+     backdrop on every scrolled frame makes the message list stutter. */
+  background: rgba(15, 23, 42, 0.97);
   box-shadow:
     0 0 0 1px rgba(99, 102, 241, 0.1),
     0 24px 64px rgba(15, 23, 42, 0.6),
     0 8px 24px rgba(99, 102, 241, 0.15);
   overflow: hidden;
   color: #f1f5f9;
+}
+
+.chat-popup--expanded {
+  /* Above the chat launcher (z-index 50) so the bubble can't sit on the input bar. */
+  z-index: 60;
+  inset: 1.25rem;
+  width: auto;
+  height: auto;
+}
+
+/* Full screen is wide — keep the conversation column readable and centered. */
+.chat-popup--expanded .chat-messages {
+  padding-inline: max(16px, calc((100% - 720px) / 2));
+}
+
+.chat-popup--expanded .chat-category-row,
+.chat-popup--expanded .chat-cart,
+.chat-popup--expanded .chat-error,
+.chat-popup--expanded .chat-input-bar {
+  padding-inline: max(14px, calc((100% - 720px) / 2));
 }
 
 /* Header */
@@ -341,7 +378,13 @@ async function quickCategory(categoryName: string) {
   color: #e2e8f0;
 }
 
-.chat-close-btn {
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-header-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -356,7 +399,7 @@ async function quickCategory(categoryName: string) {
   padding: 0;
 }
 
-.chat-close-btn:hover {
+.chat-header-btn:hover {
   background: rgba(255, 255, 255, 0.13);
   color: #f1f5f9;
 }
@@ -365,6 +408,8 @@ async function quickCategory(categoryName: string) {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
+  /* Keep wheel/touch scrolling inside the chat from chaining to the page. */
+  overscroll-behavior: contain;
   padding: 16px;
   display: flex;
   flex-direction: column;

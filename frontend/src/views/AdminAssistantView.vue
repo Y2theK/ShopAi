@@ -24,9 +24,10 @@ onMounted(() => {
 
 async function scrollToBottom() {
   await nextTick()
-  if (messageList.value) {
-    messageList.value.scrollTop = messageList.value.scrollHeight
-  }
+  messageList.value?.scrollTo({
+    top: messageList.value.scrollHeight,
+    behavior: 'smooth',
+  })
 }
 
 watch(() => chat.messages.value.length, scrollToBottom)
@@ -155,8 +156,9 @@ function handleKeydown(e: KeyboardEvent) {
   padding: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 28px;
-  background: rgba(15, 23, 42, 0.78);
-  backdrop-filter: blur(18px);
+  /* Near-opaque instead of translucent + backdrop-filter: blurring the
+     backdrop on every scrolled frame makes the message list stutter. */
+  background: rgba(15, 23, 42, 0.94);
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.45);
   color: #f8fafc;
 }
@@ -217,6 +219,8 @@ h1 {
 .admin-messages {
   flex: 1;
   overflow-y: auto;
+  /* Keep wheel/touch scrolling inside the panel from chaining to the page. */
+  overscroll-behavior: contain;
   padding: 20px 4px;
   display: flex;
   flex-direction: column;
