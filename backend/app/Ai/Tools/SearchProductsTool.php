@@ -11,21 +11,29 @@ use Stringable;
 
 class SearchProductsTool implements Tool
 {
+    private const MAX_RESULTS = 5;
+
     public function __construct(private AgentContext $context) {}
 
     public function description(): Stringable|string
     {
-        return 'Search for products by name or keyword. Optionally filter by max price.';
+        return 'Search for products by name or keyword. Optionally filter by category name (e.g. Electronics, Clothing) and/or max price. Returns at most 5 results, best sellers first.';
     }
 
     public function handle(Request $request): Stringable|string
     {
         $query = $request->string('query');
+        $category = $request['category'] ?? null;
         $maxPrice = $request['max_price'] ?? null;
 
-        $products = Product::search($query)
-            ->when($maxPrice, fn ($q) => $q->where('price', '<=', $maxPrice))
-            ->get();
+        $matches = Product::with('category')
+            ->search($query)
+            ->inCategory($category)
+            ->when($maxPrice, fn ($q) => $q->where('price', '<=', $maxPrice));
+
+        $totalMatches = (clone $matches)->count();
+
+        $products = $matches->bestSelling()->limit(self::MAX_RESULTS)->get();
 
         if ($products->isEmpty()) {
             return 'No products found matching your search.';
@@ -37,11 +45,19 @@ class SearchProductsTool implements Tool
             $this->context->addProduct([
                 'id' => $product->id,
                 'name' => $product->name,
+                'category' => $product->category?->name,
                 'price' => (string) $product->price,
                 'stock' => $product->stock,
             ]);
 
-            $lines[] = "ID: {$product->id}, Name: {$product->name}, Price: \${$product->price}, Stock: {$product->stock}";
+            $categoryName = $product->category?->name ?? 'Uncategorized';
+
+            $lines[] = "ID: {$product->id}, Name: {$product->name}, Category: {$categoryName}, Price: \${$product->price}, Stock: {$product->stock}";
+        }
+
+        if ($totalMatches > self::MAX_RESULTS) {
+            $remaining = $totalMatches - self::MAX_RESULTS;
+            $lines[] = 'Showing the top '.self::MAX_RESULTS." best-selling matches. {$remaining} more match — suggest the user narrow down by keyword or price to see others.";
         }
 
         return implode("\n", $lines);
@@ -51,6 +67,7 @@ class SearchProductsTool implements Tool
     {
         return [
             'query' => $schema->string()->required(),
+            'category' => $schema->string(),
             'max_price' => $schema->number(),
         ];
     }

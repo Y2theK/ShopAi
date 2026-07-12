@@ -1,11 +1,18 @@
 import axios from 'axios'
 import api from './api'
 
+export type Category = {
+  id: number
+  name: string
+  slug: string
+}
+
 export type Product = {
   id: number
   name: string
   price: number
   stock: number
+  category: Category | null
 }
 
 export type OrderItem = {
@@ -22,7 +29,16 @@ export type OrderItem = {
 export type Order = {
   id: number
   user_id: number
+  order_code: string
+  status: string
   total_price: number
+  phone: string | null
+  secondary_phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  created_at: string | null
   items: OrderItem[]
 }
 
@@ -35,8 +51,24 @@ type ProductsPayload = {
   data?: Product[]
 }
 
-export async function fetchProducts() {
-  const response = await api.get<ApiEnvelope<ProductsPayload>>('/products')
+type OrdersPayload = {
+  data?: Order[]
+}
+
+export async function fetchProducts(category?: string) {
+  const response = await api.get<ApiEnvelope<ProductsPayload>>('/products', {
+    params: category ? { category } : undefined,
+  })
+  return response.data.data?.data ?? []
+}
+
+export async function fetchCategories() {
+  const response = await api.get<ApiEnvelope<Category[]>>('/categories')
+  return response.data.data ?? []
+}
+
+export async function fetchOrders() {
+  const response = await api.get<ApiEnvelope<OrdersPayload>>('/orders')
   return response.data.data?.data ?? []
 }
 

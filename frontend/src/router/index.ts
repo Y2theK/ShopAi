@@ -18,6 +18,18 @@ const router = createRouter({
       component: LoginView,
       meta: { guestOnly: true },
     },
+    {
+      path: '/orders',
+      name: 'orders',
+      component: () => import('../views/OrdersView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/AdminAssistantView.vue'),
+      meta: { requiresAuth: true, adminOnly: true },
+    },
   ],
 })
 
@@ -27,6 +39,10 @@ function requiresAuth(path: typeof router.currentRoute.value) {
 
 function isGuestOnly(path: typeof router.currentRoute.value) {
   return path.matched.some((record) => record.meta.guestOnly)
+}
+
+function isAdminOnly(path: typeof router.currentRoute.value) {
+  return path.matched.some((record) => record.meta.adminOnly)
 }
 
 router.beforeEach(async (to) => {
@@ -43,6 +59,10 @@ router.beforeEach(async (to) => {
   }
 
   if (isGuestOnly(to) && auth.isAuthenticated.value) {
+    return { name: 'dashboard' }
+  }
+
+  if (isAdminOnly(to) && !auth.isAdmin.value) {
     return { name: 'dashboard' }
   }
 

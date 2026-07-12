@@ -6,14 +6,14 @@ use App\Models\Product;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Product>
+ * @extends Factory<Product>
  */
 class ProductFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
      *
-     * @var class-string<\App\Models\Product>
+     * @var class-string<Product>
      */
     protected $model = Product::class;
 
@@ -26,6 +26,7 @@ class ProductFactory extends Factory
     {
         return [
             'name' => ucfirst($this->faker->unique()->words(2, true)),
+            'category_id' => null,
             'price' => $this->faker->randomFloat(0, 5, 500),
             'stock' => $this->faker->numberBetween(0, 250),
         ];

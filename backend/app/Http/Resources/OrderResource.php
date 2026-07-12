@@ -17,7 +17,16 @@ class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
+            'order_code' => $this->order_code,
+            'status' => $this->status,
             'total_price' => (float) $this->total_price,
+            'phone' => $this->phone,
+            'secondary_phone' => $this->secondary_phone,
+            'address' => $this->address,
+            'city' => $this->city,
+            'state' => $this->state,
+            'country' => $this->country,
+            'created_at' => $this->created_at?->toISOString(),
             'items' => $this->whenLoaded('items', function () {
                 return $this->items->map(function ($item) {
                     return [

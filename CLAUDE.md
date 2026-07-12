@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mini SaaS-style e-commerce app. Laravel 12 REST API backend + Vue 3 TypeScript frontend. All users share the same permission level (no roles). Stack: Laravel 12, SQLite, Laravel Sanctum, Vue 3, Vite, Axios.
+Mini SaaS-style e-commerce app. Laravel 12 REST API backend + Vue 3 TypeScript frontend. Users share the same permission level except for an `is_admin` boolean flag on `users`, which gates admin-only features (the admin assistant agent). Stack: Laravel 12, SQLite, Laravel Sanctum, Vue 3, Vite, Axios.
 
 ## Commands
 
@@ -34,13 +34,19 @@ Controllers use `ApiResponseTrait` (`app/Traits/ApiResponseTrait.php`) for all J
 
 Order creation (`OrderController::store`) validates stock before writing, then wraps the Order + OrderItem inserts + stock decrement in a single `DB::transaction`.
 
+Two laravel/ai agents live in `app/Ai/Agents/`: `ShoppingAssistantAgent` (`POST /chat`, all users) and `AdminAssistantAgent` (`POST /admin/chat`, admin-only via the `admin` middleware alias → `EnsureUserIsAdmin`). Tools live in `app/Ai/Tools/`. Both use a side-channel context object (`AgentContext` collects products, order info, and the checkout delivery address; `ChartContext` collects chart payloads) that tools populate during the run and the controller returns alongside the agent's text reply. The admin agent is read-only by design — its tools query sales, inventory, customers, and orders but never mutate data.
+
+PII protection (`pii-masking.md` has the full design): chat controllers mask structured PII (`app/Ai/PiiMasker` — email, Myanmar NRC, MM phone, SSN, passport, long digit runs) in the user message **before** `prompt()`, so provider payloads, stored transcripts, and history replays are all sanitized — inbound masking must stay in the controllers because `RememberConversation` runs outside agent middleware and stores the raw prompt. `PiiLeakCanary` middleware on both agents is advisory-only: it re-masks inbound as defense-in-depth and logs pattern names (never values) if a reply contains raw PII. Tool results must never interpolate street addresses or unmasked phones (`MasksPii` trait, `AgentContext` side channel); customer emails in admin tools are masked via `maskEmail()`.
+
+Prompt injection defense (`prompt-injection-hardening.md` has the full design) is containment-first: detection (`PromptInjectionDetector`) is advisory-only and never blocks a single message. `TextNormalizer` (NFKC + zero-width stripping) runs inside the detector and `PiiMasker` to defeat unicode evasion. The controllers add a behavioral throttle (3 flagged messages / 10 min → 429 via `RateLimiter`), `PromptInjectionCanary` middleware covers non-controller call sites, and `FlagsSuspiciousToolData` flags injection markers in tool results that embed customer-controlled text (indirect injection).
+
 ### Frontend
 
 `src/services/auth.ts` — module-level reactive singleton managing auth state. The `useAuth()` composable is used everywhere; do not create additional auth state. The `bootstrap()` method is idempotent (deduplicated with a promise) and is called in the router guard on every navigation.
 
 `src/services/api.ts` — preconfigured Axios instance with `withCredentials: true` and `withXSRFToken: true` for Sanctum CSRF handling. Always import this `api` instance, not raw `axios`, for authenticated requests.
 
-Router (`src/router/index.ts`) uses `meta.requiresAuth` and `meta.guestOnly` guards; both are enforced via `router.beforeEach`.
+Router (`src/router/index.ts`) uses `meta.requiresAuth`, `meta.guestOnly`, and `meta.adminOnly` guards; all are enforced via `router.beforeEach`. `/admin` (admin-only) hosts the admin assistant chat with Chart.js visualizations (`ChartCard.vue` renders chart payloads from `ChartContext`).
 
 ### Auth Flow
 1. Frontend fetches `/sanctum/csrf-cookie` (via `ensureCsrfCookie`) before any login or bootstrap.
@@ -56,3 +62,4 @@ SQLite file at `backend/database/database.sqlite`. Schema: `users`, `products`, 
 - Backend: copy `backend/.env.example` → `backend/.env`, run `php artisan key:generate`
 - Frontend: copy `frontend/.env.example` → `frontend/.env`; set `VITE_API_BASE_URL` and `VITE_BACKEND_URL`
 - Demo login: `test@example.com` / `password`
+- Demo admin login: `admin@example.com` / `password`

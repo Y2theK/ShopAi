@@ -6,7 +6,7 @@ const chat = useChat()
 
 <template>
   <div class="chat-launcher">
-    <span class="chat-tooltip">Shopping Assistant</span>
+    <span v-if="!chat.isOpen.value" class="chat-tooltip">Shopping Assistant</span>
     <button
       class="chat-bubble"
       :class="{ open: chat.isOpen.value }"
@@ -52,13 +52,14 @@ const chat = useChat()
   bottom: 1.5rem;
   right: 1.5rem;
   z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
 }
 
 .chat-tooltip {
+  /* Out of flow so the launcher's hitbox stays just the bubble and the
+     label never overlaps the popup's input bar above it. */
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
   background: rgba(15, 23, 42, 0.9);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(129, 140, 248, 0.25);
