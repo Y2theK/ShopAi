@@ -60,6 +60,12 @@ class ChatController extends Controller
 
             if (! empty($payload['delivery_address'])) {
                 $context->setDeliveryAddress($payload['delivery_address']);
+
+                // Deterministic signal for the agent that this confirmation came
+                // through the checkout delivery form (the details themselves stay
+                // in the side channel, never in the prompt). Harmless if typed by
+                // hand: place_order still refuses without an attached address.
+                $message .= "\n\n[Store checkout: the delivery form is completed and the delivery details are attached to this order.]";
             }
 
             $agent = new ShoppingAssistantAgent($user, $context);

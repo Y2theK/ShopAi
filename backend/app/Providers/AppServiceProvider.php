@@ -45,8 +45,8 @@ class AppServiceProvider extends ServiceProvider
             $key = $request->user()?->id ?? $request->ip();
 
             return [
-                Limit::perMinute(10)->by('minute:'.$key),
-                Limit::perDay(50)->by('day:'.$key),
+                Limit::perMinute((int) config('chat.rate_limits.per_minute'))->by('minute:'.$key),
+                Limit::perDay((int) config('chat.rate_limits.per_day'))->by('day:'.$key),
             ];
         });
 
@@ -54,8 +54,8 @@ class AppServiceProvider extends ServiceProvider
             $key = $request->user()?->id ?? $request->ip();
 
             return [
-                Limit::perMinute(20)->by('minute:'.$key),
-                Limit::perDay(200)->by('day:'.$key),
+                Limit::perMinute((int) config('chat.rate_limits.admin_per_minute'))->by('minute:'.$key),
+                Limit::perDay((int) config('chat.rate_limits.admin_per_day'))->by('day:'.$key),
             ];
         });
     }

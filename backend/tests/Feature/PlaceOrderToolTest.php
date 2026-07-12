@@ -16,12 +16,28 @@ class PlaceOrderToolTest extends TestCase
 {
     use LazilyRefreshDatabase;
 
+    private function contextWithDeliveryAddress(): AgentContext
+    {
+        $context = new AgentContext;
+
+        $context->setDeliveryAddress([
+            'phone' => '0912345678',
+            'secondary_phone' => null,
+            'address' => '123 Main Street',
+            'city' => 'Yangon',
+            'state' => 'Yangon Region',
+            'country' => 'Myanmar',
+        ]);
+
+        return $context;
+    }
+
     public function test_a_valid_order_is_placed_and_stock_is_decremented(): void
     {
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
 
-        $context = new AgentContext;
+        $context = $this->contextWithDeliveryAddress();
 
         $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
@@ -38,7 +54,7 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 100]);
 
-        $context = new AgentContext;
+        $context = $this->contextWithDeliveryAddress();
 
         $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 21]],
@@ -57,7 +73,7 @@ class PlaceOrderToolTest extends TestCase
 
         $items = $products->map(fn (Product $p) => ['product_id' => $p->id, 'quantity' => 1])->all();
 
-        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request(['items' => $items]));
+        $result = (string) (new PlaceOrderTool($user, $this->contextWithDeliveryAddress()))->handle(new Request(['items' => $items]));
 
         $this->assertStringContainsString('at most 10 different products', $result);
         $this->assertSame(0, Order::count());
@@ -68,7 +84,7 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['price' => 10, 'stock' => 100]);
 
-        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
+        $result = (string) (new PlaceOrderTool($user, $this->contextWithDeliveryAddress()))->handle(new Request([
             'items' => [
                 ['product_id' => $product->id, 'quantity' => 1],
                 ['product_id' => $product->id, 'quantity' => 2],
@@ -85,7 +101,7 @@ class PlaceOrderToolTest extends TestCase
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
         Product::factory()->create(['name' => 'Keyboard', 'price' => 40, 'stock' => 30]);
 
-        $context = new AgentContext;
+        $context = $this->contextWithDeliveryAddress();
 
         $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 1]],
@@ -109,7 +125,7 @@ class PlaceOrderToolTest extends TestCase
         Product::factory()->create(['name' => 'Keyboard', 'price' => 40, 'stock' => 30, 'category_id' => $electronics->id]);
         Product::factory()->create(['name' => 'T-Shirt', 'price' => 15, 'stock' => 80, 'category_id' => $clothing->id]);
 
-        $context = new AgentContext;
+        $context = $this->contextWithDeliveryAddress();
 
         $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 1]],
@@ -155,17 +171,22 @@ class PlaceOrderToolTest extends TestCase
         $this->assertSame('Myanmar', $order->country);
     }
 
-    public function test_an_order_without_a_delivery_address_still_succeeds(): void
+    public function test_an_order_without_a_delivery_address_is_rejected(): void
     {
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Mouse', 'price' => 10, 'stock' => 50]);
 
-        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
+        $context = new AgentContext;
+
+        $result = (string) (new PlaceOrderTool($user, $context))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 1]],
         ]));
 
-        $this->assertStringContainsString('placed successfully', $result);
-        $this->assertNull(Order::first()->address);
+        $this->assertStringContainsString('no delivery details', $result);
+        $this->assertStringContainsString('cart checkout', $result);
+        $this->assertSame(0, Order::count());
+        $this->assertSame(50, $product->fresh()->stock);
+        $this->assertFalse($context->orderWasPlaced());
     }
 
     public function test_orders_above_the_total_cap_are_rejected(): void
@@ -173,7 +194,7 @@ class PlaceOrderToolTest extends TestCase
         $user = User::factory()->create();
         $product = Product::factory()->create(['name' => 'Server Rack', 'price' => 6000, 'stock' => 10]);
 
-        $result = (string) (new PlaceOrderTool($user, new AgentContext))->handle(new Request([
+        $result = (string) (new PlaceOrderTool($user, $this->contextWithDeliveryAddress()))->handle(new Request([
             'items' => [['product_id' => $product->id, 'quantity' => 2]],
         ]));
 

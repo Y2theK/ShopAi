@@ -1,5 +1,6 @@
 import { isAxiosError } from 'axios'
 import { computed, reactive } from 'vue'
+import { formatDuration } from '../utils/duration'
 import api from './api'
 
 type Product = { id: number; name: string; price: string; stock: number }
@@ -215,10 +216,16 @@ export function useChat() {
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 429) {
         const retryAfter = Number(err.response.headers['retry-after'])
-        state.error =
-          Number.isFinite(retryAfter) && retryAfter > 0
-            ? `You're sending messages too quickly — try again in ${retryAfter}s.`
-            : "You're sending messages too quickly — please slow down."
+        if (Number.isFinite(retryAfter) && retryAfter > 0) {
+          // Anything beyond an hour can only be the daily cap, not the
+          // per-minute burst limit — word it accordingly.
+          state.error =
+            retryAfter > 3600
+              ? `You've reached today's message limit — try again in ${formatDuration(retryAfter)}.`
+              : `You're sending messages too quickly — try again in ${formatDuration(retryAfter)}.`
+        } else {
+          state.error = "You're sending messages too quickly — please slow down."
+        }
       } else {
         state.error = 'Failed to send message. Please try again.'
       }

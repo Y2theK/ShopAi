@@ -31,11 +31,15 @@ class PlaceOrderTool implements Tool
 
     public function description(): Stringable|string
     {
-        return 'Place an order for one or more products on behalf of the user. Always confirm with the user before calling this.';
+        return 'Place an order for one or more products on behalf of the user. Only works during the store cart checkout flow — it fails unless the checkout form has collected the delivery details. Always confirm with the user before calling this.';
     }
 
     public function handle(Request $request): Stringable|string
     {
+        if ($this->context->getDeliveryAddress() === null) {
+            return 'Order not placed: no delivery details are attached to this conversation. Orders can only be completed through the cart checkout. Tell the user to add the items to their cart using the "Add to cart" button on the product cards, then press Checkout — the store collects their delivery details there. Never ask the user to type delivery details or order confirmations in chat.';
+        }
+
         $items = $request->array('items');
 
         if (count($items) > self::MAX_DISTINCT_ITEMS) {
