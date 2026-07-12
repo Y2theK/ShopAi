@@ -3,12 +3,12 @@
 namespace App\Ai\Tools;
 
 use App\Ai\AgentContext;
+use App\CacheGroup;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -111,7 +111,7 @@ class PlaceOrderTool implements Tool
             return $order;
         });
 
-        Cache::tags(['products'])->flush();
+        CacheGroup::for('products')->flush();
 
         $this->context->markOrderPlaced();
 

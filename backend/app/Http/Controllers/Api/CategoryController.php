@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\CacheGroup;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Cache;
 
 class CategoryController extends Controller
 {
@@ -15,7 +15,7 @@ class CategoryController extends Controller
 
     public function index(): JsonResponse
     {
-        $data = Cache::tags(['categories'])->remember(
+        $data = CacheGroup::for('categories')->remember(
             'categories:index',
             3600,
             fn () => CategoryResource::collection(Category::orderBy('name')->get())->resolve(),

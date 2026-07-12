@@ -3,8 +3,8 @@
 namespace App\Ai\Concerns;
 
 use App\Ai\ChartContext;
+use App\CacheGroup;
 use Closure;
-use Illuminate\Support\Facades\Cache;
 
 trait CachesToolResults
 {
@@ -15,7 +15,7 @@ trait CachesToolResults
      */
     protected function cached(string $key, Closure $compute, int $ttl = 300, ?ChartContext $context = null): string
     {
-        $cache = Cache::tags(['ai-tools']);
+        $cache = CacheGroup::for('ai-tools');
 
         $hit = $cache->get($key);
 

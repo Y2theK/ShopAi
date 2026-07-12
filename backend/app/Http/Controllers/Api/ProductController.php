@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\CacheGroup;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
 use App\Traits\ApiResponseTrait;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -21,7 +21,7 @@ class ProductController extends Controller
         $perPage = min(100, max(1, (int) $request->query('per_page', 15)));
         $page = max(1, (int) $request->query('page', 1));
 
-        $data = Cache::tags(['products'])->remember(
+        $data = CacheGroup::for('products')->remember(
             sprintf('products:index:%s:%s:%d:%d', md5((string) $search), md5((string) $category), $page, $perPage),
             60,
             function () use ($search, $category, $perPage) {

@@ -57,7 +57,7 @@ COPY backend/docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY backend/docker/entrypoint.sh /usr/local/bin/app-entrypoint
 COPY backend/docker/app-web.sh /usr/local/bin/app-web
 RUN chmod +x /usr/local/bin/app-entrypoint /usr/local/bin/app-web \
-    && apk add --no-cache nginx redis \
+    && apk add --no-cache nginx \
     && mkdir -p /run/nginx \
     && chown -R app:app /run/nginx /var/lib/nginx /var/log/nginx
 

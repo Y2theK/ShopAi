@@ -18,11 +18,7 @@ x-backend: &backend
     DB_USERNAME: ShopAi
     DB_PASSWORD: ${DB_PASSWORD:-ShopAi-local-pw}
     SESSION_DRIVER: database
-    # Redis is required for the cache: product/category/AI-tool caching uses
-    # cache tags, which the database store does not support.
-    CACHE_STORE: redis
-    REDIS_CLIENT: predis
-    REDIS_HOST: redis
+    CACHE_STORE: database
     QUEUE_CONNECTION: database
     LOG_CHANNEL: stderr
     LOG_LEVEL: info
@@ -57,21 +53,10 @@ services:
       retries: 30
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 3s
-      timeout: 2s
-      retries: 10
-
   app:
     <<: *backend
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     healthcheck:
       # The entrypoint touches this file after migrations and caching finish.
@@ -87,8 +72,6 @@ services:
     restart: unless-stopped
     depends_on:
       app:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   web:
